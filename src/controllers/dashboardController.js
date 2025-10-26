@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import WorkflowLog from "../models/WorkflowLog.js";
 
 // Kullanıcının genel istatistiklerini döndürür
