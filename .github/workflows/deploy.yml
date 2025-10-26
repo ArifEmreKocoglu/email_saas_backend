@@ -1,0 +1,30 @@
+name: Auto Deploy to AWS (Docker)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy Backend to AWS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Connect to EC2 and Deploy
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ~/email_saas_backend
+            echo "🔄 Pulling latest changes..."
+            git pull origin main
+            echo "🐳 Rebuilding Docker containers..."
+            docker-compose down
+            docker-compose up -d --build
+            echo "✅ Deployment completed successfully!"
