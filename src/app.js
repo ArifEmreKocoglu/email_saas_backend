@@ -11,30 +11,38 @@ import planRoutes from "./routes/plan.js";
 import logRoutes from "./routes/logs.js";
 import dashboardRoutes from "./routes/dashboard.js";
 
-
-
-
-
 dotenv.config();
 const app = express();
 
-// ✅ CORS middleware - en başta olmalı
-app.use(cors());
+// ✅ Geniş izinli ama güvenli CORS ayarı
+const allowedOrigins = [
+  "http://localhost:3000", // local dev
+  "https://entrfy.com",
+  "https://www.entrfy.com",
+  "https://api.entrfy.com"
+];
 
-// ✅ OPTIONS preflight istekleri için global izin
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("CORS not allowed for this origin: " + origin));
+      }
+    },
+    credentials: true,
+  })
+);
+
 app.options("*", cors());
-
 app.use(express.json());
 
-// ✅ Mongo bağlantısı
+// ✅ DB connect
 connectMongo();
 
-// ✅ Health check route
-app.get("/health", (req, res) => {
-  res.json({ status: "ok", message: "Backend running" });
-});
-
-// ✅ Tüm route'lar
+// ✅ Routes
+app.get("/health", (req, res) => res.json({ status: "ok", message: "Backend running" }));
 app.use("/auth", oauthRoutes);
 app.use("/api", n8nRoutes);
 app.use("/api/gmail", gmailRoutes);
@@ -44,6 +52,5 @@ app.use("/api/plans", planRoutes);
 app.use("/api/logs", logRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 
-
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
