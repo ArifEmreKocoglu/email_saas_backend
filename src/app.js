@@ -17,22 +17,31 @@ import dashboardRoutes from "./routes/dashboard.js";
 
 dotenv.config();
 const app = express();
+
+// ✅ CORS middleware - en başta olmalı
 app.use(
   cors({
     origin: ["http://localhost:3000", "https://app.entrfy.com"],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept", "Authorization"],
     credentials: true,
   })
 );
+
+// ✅ OPTIONS preflight istekleri için global izin
+app.options("*", cors());
+
 app.use(express.json());
 
-// Connect DB
+// ✅ Mongo bağlantısı
 connectMongo();
 
+// ✅ Health check route
 app.get("/health", (req, res) => {
   res.json({ status: "ok", message: "Backend running" });
 });
 
+// ✅ Tüm route'lar
 app.use("/auth", oauthRoutes);
 app.use("/api", n8nRoutes);
 app.use("/api/gmail", gmailRoutes);
