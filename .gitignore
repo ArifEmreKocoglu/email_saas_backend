@@ -1,0 +1,52 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs
+*.log
+log/
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Docker
+docker-compose.override.yml
+.docker/
+.dockerignore
+
+# System files
+.DS_Store
+Thumbs.db
+*.swp
+
+# Build outputs
+dist/
+build/
+.tmp/
+
+# VSCode
+.vscode/
+.idea/
+
+# Test & coverage
+coverage/
+*.lcov
+
+# Optional lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Misc
+*.tgz

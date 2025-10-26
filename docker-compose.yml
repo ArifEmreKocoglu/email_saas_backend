@@ -1,0 +1,15 @@
+services:
+  mail-backend:
+    build: .
+    container_name: mail-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+    networks:
+      - ops_net
+
+networks:
+  ops_net:
+    external: true
