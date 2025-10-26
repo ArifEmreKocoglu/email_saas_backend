@@ -19,7 +19,9 @@ dotenv.config();
 const app = express();
 app.use(
   cors({
-    origin: "*",
+    origin: ["http://localhost:3000", "https://app.entrfy.com"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
   })
 );
 app.use(express.json());
