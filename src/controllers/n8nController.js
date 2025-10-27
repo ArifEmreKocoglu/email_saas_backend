@@ -97,14 +97,14 @@ export const handleGmailPush = async (req, res) => {
           const started = Date.now();
           try {
             const n8nRes = await axios.post(
-              `${process.env.N8N_URL}${process.env.N8N_INGEST_PATH || "/webhook/mail-ingest-v0"}`,
+              `${process.env.N8N_URL}${process.env.N8N_INGEST_PATH || "/webhook/mail-ingest-v1"}`,
               payload,
               { headers: { "Content-Type": "application/json" } }
             );
 
             await WorkflowLog.create({
               userId: acc.userId,
-              workflowName: "mail-ingest-v0",
+              workflowName: "mail-ingest-v1",
               status: "success",
               message: "Delivered to n8n",
               email: emailAddress,
@@ -118,7 +118,7 @@ export const handleGmailPush = async (req, res) => {
           } catch (postErr) {
             await WorkflowLog.create({
               userId: acc.userId,
-              workflowName: "mail-ingest-v0",
+              workflowName: "mail-ingest-v1",
               status: "error",
               message: "n8n webhook error",
               email: emailAddress,
