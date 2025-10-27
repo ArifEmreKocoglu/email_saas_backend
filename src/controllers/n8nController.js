@@ -39,24 +39,34 @@ function extractParts(payload) {
 // ---- Pub/Sub push endpoint ----
 export const handleGmailPush = async (req, res) => {
   try {
+
+    console.log("📨 Push HIT", {
+      path: req.path,
+      ip: req.headers["x-forwarded-for"] || req.ip,
+      ua: req.headers["user-agent"],
+    });
+
+
     const msg = req.body?.message;
     if (!msg?.data) return res.status(204).end(); // erken ACK
 
+    console.log("2");
     const decoded = JSON.parse(Buffer.from(msg.data, "base64").toString("utf8"));
     const { emailAddress, historyId } = decoded || {};
-
+    console.log("3");
     // her koşulda ACK ver, işleme arkada devam et
     res.status(204).end();
     if (!emailAddress || !historyId) return;
-
+    console.log("4");
     // 1) Hesap bazlı çalış
     const acc = await MailAccount.findOne({ provider: "gmail", email: emailAddress });
     if (!acc) { console.warn("[gmail push] MailAccount yok:", emailAddress); return; }
     if (acc.status !== "active" || !acc.isActive) { console.log("[gmail push] paused/deleted:", emailAddress); return; }
-
+    console.log("5");
     // 2) Token yenileme (hesap)
     const now = Date.now();
     if (acc.expiresAt && acc.expiresAt.getTime() <= now) {
+      console.log("7");
       try {
         const { data } = await axios.post("https://oauth2.googleapis.com/token", {
           client_id: process.env.GOOGLE_CLIENT_ID,
@@ -64,6 +74,7 @@ export const handleGmailPush = async (req, res) => {
           refresh_token: acc.refreshToken,
           grant_type: "refresh_token",
         });
+        console.log("6");
         acc.accessToken = data.access_token;
         acc.expiresAt = new Date(now + (data.expires_in || 3600) * 1000);
         await acc.save();
@@ -74,14 +85,17 @@ export const handleGmailPush = async (req, res) => {
     }
 
     const auth = oauthClient();
+    console.log("8");
     auth.setCredentials({ access_token: acc.accessToken, refresh_token: acc.refreshToken });
+    console.log("9");
     const gmail = google.gmail({ version: "v1", auth });
+    console.log("10");
 
     // 3) History akışı (sayfalama + dedupe)
     const startHistoryId = String(acc.lastHistoryId || acc.historyId || historyId);
     let pageToken;
     const seen = new Set();
-
+    console.log("11");
     do {
       let histRes;
       try {
@@ -91,14 +105,17 @@ export const handleGmailPush = async (req, res) => {
           historyTypes: ["messageAdded"],
           pageToken,
         });
+        console.log("12");
       } catch (err) {
         // 4) "HistoryId too old" reset
         const reason = err?.errors?.[0]?.reason || err?.response?.data?.error?.errors?.[0]?.reason;
+        console.log("14");
         if (err?.code === 404 || reason === "historyIdInvalid") {
           console.warn("[history] too old → reset to current profile.historyId");
           const prof = await gmail.users.getProfile({ userId: "me" });
           acc.lastHistoryId = String(prof.data.historyId);
           await acc.save();
+          console.log("12");
           return;
         }
         console.error("[history.list] error:", err?.response?.data || err.message);
@@ -106,13 +123,14 @@ export const handleGmailPush = async (req, res) => {
       }
 
       const chunks = histRes.data.history || [];
+      console.log("15");
       for (const h of chunks) {
         for (const m of h.messages || []) {
           if (seen.has(m.id)) continue;
           seen.add(m.id);
-
+          console.log("18");
           const full = await gmail.users.messages.get({ userId: "me", id: m.id, format: "full" });
-
+          console.log("19");
           const headers = full.data.payload?.headers || [];
           const subject = header(headers, "Subject");
           const from = header(headers, "From");
@@ -142,6 +160,7 @@ export const handleGmailPush = async (req, res) => {
           };
 
           try {
+            console.log("16");
             await axios.post(
               `${process.env.N8N_URL}/webhook/mail-ingest-v1`,
               payload,
