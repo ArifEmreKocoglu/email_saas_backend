@@ -1,12 +1,8 @@
 import express from "express";
-import { createLog, getLogs } from "../controllers/logController.js";
-
+import { listLogs } from "../controllers/logsController.js";
 const router = express.Router();
 
-// n8n backend’e log POST eder → DB’ye kaydedilir
-router.post("/", createLog);
-
-// frontend Logs Page → kullanıcı loglarını GET eder
-router.get("/", getLogs);
+// GET /api/logs?userId=...&page=1&limit=50
+router.get("/", listLogs);
 
 export default router;

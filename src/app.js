@@ -1,5 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
+import cookieParser from "cookie-parser";
+
 import cors from "cors";
 import connectMongo from "./config/mongo.js";
 import oauthRoutes from "./routes/oauth.js";
@@ -10,6 +12,9 @@ import mailAccountRoutes from "./routes/mailAccount.js";
 import planRoutes from "./routes/plan.js";
 import logRoutes from "./routes/logs.js";
 import dashboardRoutes from "./routes/dashboard.js";
+import { startRewatchJob } from "./jobs/rewatchJob.js";
+import authLocalRoutes from "./routes/authLocal.js";
+
 
 dotenv.config();
 const app = express();
@@ -35,8 +40,11 @@ app.use(
   })
 );
 
-app.options("*", cors());
 app.use(express.json());
+
+
+app.set("trust proxy", 1);        // prod'da proxy arkasındaysan güvenli cookie için
+app.use(cookieParser());          // <-- JWT cookie okumak için şart
 
 // ✅ DB connect
 connectMongo();
@@ -51,6 +59,13 @@ app.use("/api/mail-accounts", mailAccountRoutes);
 app.use("/api/plans", planRoutes);
 app.use("/api/logs", logRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/auth", authLocalRoutes);
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+console.log("ENV check → has JWT:", process.env.JWT_SECRET, PORT);
+
+
+app.listen(PORT, () => {
+console.log(`✅ Server running on port ${PORT}`);
+startRewatchJob();
+});

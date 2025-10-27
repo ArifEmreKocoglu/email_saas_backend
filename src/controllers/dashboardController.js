@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import WorkflowLog from "../models/WorkflowLog.js";
+import WorkflowLog from "../models/Workflow.js";
 
 // Kullanıcının genel istatistiklerini döndürür
 export const getDashboardStats = async (req, res) => {

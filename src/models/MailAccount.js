@@ -1,22 +1,32 @@
 import mongoose from "mongoose";
 
-const MailAccountSchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-    required: true,
+const MailAccountSchema = new mongoose.Schema(
+  {
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    provider: { type: String, enum: ["gmail"], default: "gmail", index: true },
+
+    email: { type: String, required: true, lowercase: true, trim: true },
+    googleId: { type: String, default: null },
+
+    accessToken: String,
+    refreshToken: String,
+    expiresAt: Date,
+
+    status: { type: String, enum: ["active", "deleted"], default: "active" },
+    isActive: { type: Boolean, default: true },
+
+    historyId: { type: String, default: null },
+    lastHistoryId: { type: String, default: null },
+    watchExpiration: { type: Date, default: null },
+
+    labelMap: { type: mongoose.Schema.Types.Mixed, default: {} },
+
+    connectedAt: { type: Date, default: Date.now },
   },
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-  },
-  accessToken: String,
-  refreshToken: String,
-  expiresAt: Date,
-  labelIds: [String],
-  isActive: { type: Boolean, default: true },
-  connectedAt: { type: Date, default: Date.now },
-});
+  { timestamps: true }
+);
+
+// Aynı kullanıcıda aynı email + provider tek olsun:
+MailAccountSchema.index({ userId: 1, provider: 1, email: 1 }, { unique: true });
 
 export default mongoose.model("MailAccount", MailAccountSchema);

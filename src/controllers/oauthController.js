@@ -1,76 +1,95 @@
-import querystring from "querystring";
-import axios from "axios";
-import User from "../models/User.js"; // ✅ User modelini ekledik
+import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
+import { google } from "googleapis";
+import MailAccount from "../models/MailAccount.js";
+import User from "../models/User.js";
 
-export const googleLogin = async (req, res) => {
-  const base = "https://accounts.google.com/o/oauth2/v2/auth";
-  const params = querystring.stringify({
-    client_id: process.env.GOOGLE_CLIENT_ID,
-    redirect_uri: process.env.GOOGLE_REDIRECT_URI,
-    response_type: "code",
-    scope: [
-      "https://mail.google.com/",
-      "https://www.googleapis.com/auth/gmail.modify",
-      "https://www.googleapis.com/auth/userinfo.email",
-      "https://www.googleapis.com/auth/userinfo.profile",
-      "openid",
-    ].join(" "),
-    access_type: "offline",
-    prompt: "consent",
-  });
+function must(name) {
+  if (!process.env[name]) throw new Error(`${name} is missing`);
+}
 
-  return res.redirect(`${base}?${params}`);
-};
+const SCOPES = ["openid","email","profile","https://www.googleapis.com/auth/gmail.modify"];
 
-export const googleCallback = async (req, res) => {
-  const { code } = req.query;
-  if (!code) return res.status(400).json({ error: "Missing code" });
+function oauthClient() {
+  must("GOOGLE_CLIENT_ID"); must("GOOGLE_CLIENT_SECRET"); must("GOOGLE_REDIRECT_URI");
+  return new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI
+  );
+}
 
+export async function startGoogleConnect(req, res) {
   try {
-    // 1️⃣ Token isteği
-    const { data } = await axios.post("https://oauth2.googleapis.com/token", {
-      code,
-      client_id: process.env.GOOGLE_CLIENT_ID,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET,
-      redirect_uri: process.env.GOOGLE_REDIRECT_URI,
-      grant_type: "authorization_code",
+    must("JWT_SECRET");
+    const userId = String(req.query.userId || "");
+    if (!mongoose.isValidObjectId(userId)) return res.status(400).send("Invalid userId");
+
+    const state = jwt.sign({ userId, mode: "connect" }, process.env.JWT_SECRET, { expiresIn: "15m" });
+    const client = oauthClient();
+    const url = client.generateAuthUrl({
+      access_type: "offline",
+      prompt: "consent",
+      include_granted_scopes: true,
+      scope: SCOPES,
+      state,
     });
+    return res.redirect(url);
+  } catch (e) {
+    console.error("[/auth/google] error:", e);
+    return res.status(500).send(`[oauth] ${e.message}`);
+  }
+}
 
-    const { access_token, refresh_token, expires_in, id_token } = data;
+export async function googleCallback(req, res) {
+  try {
+    must("JWT_SECRET");
+    const { code, state } = req.query;
+    const { userId } = jwt.verify(state, process.env.JWT_SECRET);
 
-    // 2️⃣ Kullanıcı bilgilerini al
-    const { data: profile } = await axios.get(
-      "https://www.googleapis.com/oauth2/v2/userinfo",
+    const client = oauthClient();
+    const { tokens } = await client.getToken(String(code));
+    client.setCredentials(tokens);
+
+    const oauth2 = google.oauth2({ version: "v2", auth: client });
+    const me = await oauth2.userinfo.get();
+    const email = me.data.email;
+    const googleId = me.data.id;
+
+    if (!email) return res.status(400).send("Email not found from Google");
+
+    const account = await MailAccount.findOneAndUpdate(
+      { userId, provider: "gmail", email },
       {
-        headers: { Authorization: `Bearer ${access_token}` },
-      }
+        $set: {
+          userId, provider: "gmail", email, googleId,
+          accessToken: tokens.access_token || null,
+          refreshToken: tokens.refresh_token || null,
+          expiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+          status: "active",
+        },
+      },
+      { upsert: true, new: true }
     );
 
-    // 3️⃣ Token süresi hesapla
-    const expiresAt = new Date(Date.now() + expires_in * 1000);
+    const gmail = google.gmail({ version: "v1", auth: client });
+    const watchRes = await gmail.users.watch({
+      userId: "me",
+      requestBody: {
+        topicName: process.env.GMAIL_PUBSUB_TOPIC,
+        labelIds: ["INBOX"],
+        labelFilterAction: "include",
+      },
+    });
 
-    // 4️⃣ Kullanıcıyı veritabanına kaydet veya güncelle
-    const existingUser = await User.findOne({ googleId: profile.id });
+    account.historyId = watchRes.data.historyId || null;
+    account.lastHistoryId = account.historyId;
+    account.watchExpiration = watchRes.data.expiration ? new Date(Number(watchRes.data.expiration)) : null;
+    await account.save();
 
-    if (existingUser) {
-      existingUser.accessToken = access_token;
-      existingUser.refreshToken = refresh_token || existingUser.refreshToken;
-      existingUser.expiresAt = expiresAt;
-      await existingUser.save();
-    } else {
-      await User.create({
-        googleId: profile.id,
-        email: profile.email,
-        accessToken: access_token,
-        refreshToken: refresh_token,
-        expiresAt,
-      });
-    }
-
-    // 5️⃣ Sonuç dön
-    res.json({ success: true, email: profile.email });
-  } catch (err) {
-    console.error("OAuth Error:", err.response?.data || err.message);
-    res.status(500).json({ error: "OAuth error" });
+    return res.redirect(`${process.env.FRONTEND_URL}/auth/callback?status=success&email=${encodeURIComponent(email)}`);
+  } catch (e) {
+    console.error("[/auth/google/callback] error:", e);
+    return res.redirect(`${process.env.FRONTEND_URL}/auth/callback?status=error&msg=${encodeURIComponent(e.message)}`);
   }
-};
+}

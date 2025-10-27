@@ -1,9 +1,8 @@
 import express from "express";
-import { googleLogin, googleCallback } from "../controllers/oauthController.js";
-
+import { startGoogleConnect, googleCallback } from "../controllers/oauthController.js";
 const router = express.Router();
 
-router.get("/google", googleLogin);
-router.get("/google/callback", googleCallback);
+router.get("/google", startGoogleConnect);        // /auth/google?userId=...
+router.get("/google/callback", googleCallback);   // redirect URI
 
 export default router;
