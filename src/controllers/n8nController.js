@@ -1,33 +1,60 @@
 import axios from "axios";
 import { google } from "googleapis";
 import MailAccount from "../models/MailAccount.js";
-import WorkflowLog from "../models/Workflow.js";
-import { buildPayload } from "../services/gmailMessage.js";
 
+// ---- helpers ----
 function oauthClient() {
   return new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET
   );
 }
+function header(headers = [], name = "") {
+  const h = headers.find((x) => x.name?.toLowerCase() === name.toLowerCase());
+  return h?.value || "";
+}
+function extractParts(payload) {
+  let html = "", text = "";
+  const attachments = [];
+  const walk = (part) => {
+    if (!part) return;
+    if (part.mimeType === "text/html" && part.body?.data) {
+      html += Buffer.from(part.body.data, "base64").toString("utf8");
+    } else if (part.mimeType === "text/plain" && part.body?.data) {
+      text += Buffer.from(part.body.data, "base64").toString("utf8");
+    } else if (part.filename && part.body?.attachmentId) {
+      attachments.push({
+        fileName: part.filename,
+        mimeType: part.mimeType,
+        size: part.body?.size || 0,
+        attachmentId: part.body.attachmentId,
+      });
+    }
+    if (part.parts) part.parts.forEach(walk);
+  };
+  walk(payload);
+  return { html, text, attachments };
+}
 
+// ---- Pub/Sub push endpoint ----
 export const handleGmailPush = async (req, res) => {
   try {
     const msg = req.body?.message;
-    if (!msg?.data) return res.status(204).end();
+    if (!msg?.data) return res.status(204).end(); // erken ACK
+
     const decoded = JSON.parse(Buffer.from(msg.data, "base64").toString("utf8"));
     const { emailAddress, historyId } = decoded || {};
-    res.status(204).end(); // erken ACK
 
+    // her koşulda ACK ver, işleme arkada devam et
+    res.status(204).end();
     if (!emailAddress || !historyId) return;
 
+    // 1) Hesap bazlı çalış
     const acc = await MailAccount.findOne({ provider: "gmail", email: emailAddress });
-    if (!acc) {
-      console.warn("[gmail push] MailAccount yok:", emailAddress);
-      return;
-    }
+    if (!acc) { console.warn("[gmail push] MailAccount yok:", emailAddress); return; }
+    if (acc.status !== "active" || !acc.isActive) { console.log("[gmail push] paused/deleted:", emailAddress); return; }
 
-    // Token yenile (gerekirse)
+    // 2) Token yenileme (hesap)
     const now = Date.now();
     if (acc.expiresAt && acc.expiresAt.getTime() <= now) {
       try {
@@ -50,7 +77,7 @@ export const handleGmailPush = async (req, res) => {
     auth.setCredentials({ access_token: acc.accessToken, refresh_token: acc.refreshToken });
     const gmail = google.gmail({ version: "v1", auth });
 
-    // History akışı (sayfalama + dedupe)
+    // 3) History akışı (sayfalama + dedupe)
     const startHistoryId = String(acc.lastHistoryId || acc.historyId || historyId);
     let pageToken;
     const seen = new Set();
@@ -65,8 +92,10 @@ export const handleGmailPush = async (req, res) => {
           pageToken,
         });
       } catch (err) {
-        if (err?.code === 404 || err?.errors?.[0]?.reason === "historyIdInvalid") {
-          console.warn("[history] historyId too old → reset");
+        // 4) "HistoryId too old" reset
+        const reason = err?.errors?.[0]?.reason || err?.response?.data?.error?.errors?.[0]?.reason;
+        if (err?.code === 404 || reason === "historyIdInvalid") {
+          console.warn("[history] too old → reset to current profile.historyId");
           const prof = await gmail.users.getProfile({ userId: "me" });
           acc.lastHistoryId = String(prof.data.historyId);
           await acc.save();
@@ -82,55 +111,48 @@ export const handleGmailPush = async (req, res) => {
           if (seen.has(m.id)) continue;
           seen.add(m.id);
 
-          const full = await gmail.users.messages.get({
-            userId: "me",
-            id: m.id,
-            format: "full",
-          });
+          const full = await gmail.users.messages.get({ userId: "me", id: m.id, format: "full" });
 
-          const payload = buildPayload(full.data, {
+          const headers = full.data.payload?.headers || [];
+          const subject = header(headers, "Subject");
+          const from = header(headers, "From");
+          const to = header(headers, "To");
+          const date = header(headers, "Date");
+          const internalDate = Number(full.data.internalDate) || Date.now();
+          const snippet = full.data.snippet || "";
+
+          const { html, text, attachments } = extractParts(full.data.payload);
+
+          const payload = {
             emailAddress,
             accountId: acc._id.toString(),
-            historyId,
-          });
+            messageId: m.id,
+            threadId: full.data.threadId,
+            historyId: String(historyId),
+            subject,
+            from,
+            to,
+            date,
+            internalDate,
+            snippet,
+            headers,
+            html,
+            text,
+            attachments,
+          };
 
-          const started = Date.now();
           try {
-            const n8nRes = await axios.post(
-              `${process.env.N8N_URL}${process.env.N8N_INGEST_PATH || "/webhook/mail-ingest-v1"}`,
+            await axios.post(
+              `${process.env.N8N_URL}/webhook/mail-ingest-v1`,
               payload,
               { headers: { "Content-Type": "application/json" } }
             );
-
-            await WorkflowLog.create({
-              userId: acc.userId,
-              workflowName: "mail-ingest-v1",
-              status: "success",
-              message: "Delivered to n8n",
-              email: emailAddress,
-              subject: payload.subject,
-              tag: null,
-              workflowId: process.env.MAIL_WORKFLOW_ID || null,
-              executionId: n8nRes?.data?.executionId || null,
-              duration: `${((Date.now() - started) / 1000).toFixed(2)}s`,
-              errorMessage: null,
-            });
+            console.log("✅ sent to n8n:", m.id);
           } catch (postErr) {
-            await WorkflowLog.create({
-              userId: acc.userId,
-              workflowName: "mail-ingest-v1",
-              status: "error",
-              message: "n8n webhook error",
-              email: emailAddress,
-              subject: payload.subject,
-              tag: null,
-              workflowId: process.env.MAIL_WORKFLOW_ID || null,
-              executionId: null,
-              duration: `${((Date.now() - started) / 1000).toFixed(2)}s`,
-              errorMessage: postErr?.response?.data
-                ? JSON.stringify(postErr.response.data).slice(0, 500)
-                : postErr.message,
-            });
+            console.error("[n8n webhook] error:",
+              postErr?.response?.status,
+              postErr?.response?.data || postErr.message
+            );
           }
         }
       }
@@ -138,9 +160,11 @@ export const handleGmailPush = async (req, res) => {
       pageToken = histRes.data.nextPageToken;
     } while (pageToken);
 
+    // 5) Son historyId’yi hesapta tut
     acc.lastHistoryId = String(historyId);
     await acc.save();
   } catch (e) {
     console.error("[gmail push] fatal:", e);
+    // ACK verildi; sadece logla.
   }
 };
