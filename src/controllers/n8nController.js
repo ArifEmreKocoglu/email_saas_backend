@@ -157,6 +157,12 @@ export const handleGmailPush = async (req, res) => {
             html,
             text,
             attachments,
+            // 🔴 EKLENDİ: n8n tarafında dinamik Gmail çağrıları için
+            oauth: {
+              provider: "gmail",
+              email: acc.email,
+              accessToken: acc.accessToken,
+            },
           };
 
           try {
