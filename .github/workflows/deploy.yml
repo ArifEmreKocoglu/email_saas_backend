@@ -25,6 +25,8 @@ jobs:
             echo "🔄 Pulling latest changes..."
             git pull origin main
             echo "🐳 Rebuilding Docker containers..."
-            docker-compose down
-            docker-compose up -d --build
+            docker build -t email_saas_backend-mail-backend:latest .
+            docker stop mail-backend && docker rm mail-backend
+            docker run -d --name mail-backend --env-file .env -p 3000:3000 email_saas_backend-mail-backend:latest
+            docker network connect ops_net mail-backend
             echo "✅ Deployment completed successfully!"
