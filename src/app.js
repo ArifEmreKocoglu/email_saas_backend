@@ -24,7 +24,8 @@ const allowedOrigins = [
   "http://localhost:3000", // local dev
   "https://entrfy.com",
   "https://www.entrfy.com",
-  "https://api.entrfy.com"
+  "https://api.entrfy.com",
+  "https://289bd15df741.ngrok-free.app"
 ];
 
 app.use(
