@@ -1,12 +1,10 @@
 import express from "express";
 import { createLog, listLogs } from "../controllers/logsController.js";
+import { requireAuth } from "../middlewares/requireAuth.js";
 
 const router = express.Router();
 
-// POST /api/logs  → n8n buraya yazar
 router.post("/", createLog);
-
-// GET /api/logs?userId=...&page=1&limit=50  → frontend listeler
-router.get("/", listLogs);
+router.get("/", requireAuth, listLogs);   // ← burada kimlik doğrula
 
 export default router;
