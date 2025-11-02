@@ -2,8 +2,18 @@ import mongoose from "mongoose";
 
 const MailAccountSchema = new mongoose.Schema(
   {
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    provider: { type: String, enum: ["gmail"], default: "gmail", index: true },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+    provider: {
+      type: String,
+      enum: ["gmail"],
+      default: "gmail",
+      index: true,
+    },
 
     email: { type: String, required: true, lowercase: true, trim: true },
     googleId: { type: String, default: null },
@@ -21,12 +31,21 @@ const MailAccountSchema = new mongoose.Schema(
 
     labelMap: { type: mongoose.Schema.Types.Mixed, default: {} },
 
+    // ✅ Yeni alan: her mail hesabı için LLM etiket yapılandırması
+    tagsConfig: {
+      type: mongoose.Schema.Types.Mixed, // allowed, awaiting, review, vb.
+      default: null,
+    },
+
     connectedAt: { type: Date, default: Date.now },
   },
   { timestamps: true }
 );
 
 // Aynı kullanıcıda aynı email + provider tek olsun:
-MailAccountSchema.index({ userId: 1, provider: 1, email: 1 }, { unique: true });
+MailAccountSchema.index(
+  { userId: 1, provider: 1, email: 1 },
+  { unique: true }
+);
 
 export default mongoose.model("MailAccount", MailAccountSchema);

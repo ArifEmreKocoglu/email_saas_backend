@@ -9,6 +9,7 @@ export function requireAuth(req, res, next) {
   try {
     const { uid } = jwt.verify(token, process.env.JWT_SECRET);
     req.auth = { userId: uid };
+    console.log("[MAIL ROUTE HIT]", req.method, req.originalUrl);
     next();
   } catch {
     return res.status(401).json({ error: "Unauthenticated" });
