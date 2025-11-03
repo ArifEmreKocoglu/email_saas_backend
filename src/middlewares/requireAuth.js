@@ -1,6 +1,3 @@
-// src/middlewares/requireAuth.js
-import jwt from "jsonwebtoken";
-
 export function requireAuth(req, res, next) {
   const token =
     req.cookies?.sid || (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
@@ -8,8 +5,8 @@ export function requireAuth(req, res, next) {
 
   try {
     const { uid } = jwt.verify(token, process.env.JWT_SECRET);
-    req.auth = { userId: uid };
-    console.log("[MAIL ROUTE HIT]", req.method, req.originalUrl);
+    req.user = { _id: uid }; // ✅ controllers ile uyumlu
+    console.log("[MAIL ROUTE HIT]", req.method, req.originalUrl, "user:", uid);
     next();
   } catch {
     return res.status(401).json({ error: "Unauthenticated" });

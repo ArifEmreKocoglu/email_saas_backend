@@ -205,6 +205,7 @@ export async function deleteMailAccount(req, res) {
       const userId = req.user?._id;
   
       // Kullanıcıya ait mail hesabını bul
+      console.log("test:", userId);
       const account = await MailAccount.findOne({ email, userId });
       if (!account) {
         return res.status(404).json({ error: "Mail account not found" });
