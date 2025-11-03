@@ -125,12 +125,28 @@ export const handleGmailPush = async (req, res) => {
       const chunks = histRes.data.history || [];
       console.log("15");
       for (const h of chunks) {
-        for (const m of h.messages || []) {
-          if (seen.has(m.id)) continue;
+        // 🔥 Sadece yeni eklenen mesajları dikkate al
+        if (!h.messagesAdded) continue;
+      
+        for (const added of h.messagesAdded) {
+          const m = added.message;
+          if (!m || seen.has(m.id)) continue;
           seen.add(m.id);
-          console.log("18");
-          const full = await gmail.users.messages.get({ userId: "me", id: m.id, format: "full" });
-          console.log("19");
+      
+          // 🔥 Sadece INBOX etiketli mesajları işle
+          if (!m.labelIds || !m.labelIds.includes("INBOX")) {
+            console.log("⏩ skipped non-INBOX message:", m.id);
+            continue;
+          }
+      
+          console.log("📩 new message detected:", m.id);
+      
+          const full = await gmail.users.messages.get({
+            userId: "me",
+            id: m.id,
+            format: "full",
+          });
+      
           const headers = full.data.payload?.headers || [];
           const subject = header(headers, "Subject");
           const from = header(headers, "From");
@@ -138,9 +154,9 @@ export const handleGmailPush = async (req, res) => {
           const date = header(headers, "Date");
           const internalDate = Number(full.data.internalDate) || Date.now();
           const snippet = full.data.snippet || "";
-
+      
           const { html, text, attachments } = extractParts(full.data.payload);
-
+      
           const payload = {
             emailAddress,
             accountId: acc._id.toString(),
@@ -157,16 +173,14 @@ export const handleGmailPush = async (req, res) => {
             html,
             text,
             attachments,
-            // 🔴 EKLENDİ: n8n tarafında dinamik Gmail çağrıları için
             oauth: {
               provider: "gmail",
               email: acc.email,
               accessToken: acc.accessToken,
             },
           };
-
+      
           try {
-            console.log("16");
             await axios.post(
               `${process.env.N8N_URL}/webhook/mail-ingest-v1`,
               payload,
