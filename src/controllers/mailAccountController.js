@@ -17,7 +17,7 @@ export async function listByUser(req, res) {
       userId,
       status: { $ne: "deleted" },
     })
-      .select("email provider status isActive connectedAt watchExpiration lastHistoryId")
+      .select("email provider status isActive connectedAt watchExpiration lastHistoryId userId")
       .sort({ connectedAt: -1 })
       .lean();
 
