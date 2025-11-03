@@ -8,7 +8,7 @@ import oauthRoutes from "./routes/oauth.js";
 import n8nRoutes from "./routes/n8nRoutes.js";
 import gmailRoutes from "./routes/gmail.js"; 
 import gmailPushRoutes from "./routes/gmailPush.js";
-import mailAccountRoutes from "./routes/mailAccount.js";
+import mailAccountRoutes from "./routes/mailAccounts.js";
 import planRoutes from "./routes/plan.js";
 import logRoutes from "./routes/logs.js";
 import dashboardRoutes from "./routes/dashboard.js";
