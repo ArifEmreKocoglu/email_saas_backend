@@ -22,7 +22,7 @@ const MailAccountSchema = new mongoose.Schema(
     refreshToken: String,
     expiresAt: Date,
 
-    status: { type: String, enum: ["active", "deleted"], default: "active" },
+    status: { type: String, enum: ["active", "deleted", "paused"], default: "active" },
     isActive: { type: Boolean, default: true },
 
     historyId: { type: String, default: null },
