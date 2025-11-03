@@ -25,7 +25,7 @@ const allowedOrigins = [
   "https://entrfy.com",
   "https://www.entrfy.com",
   "https://api.entrfy.com",
-  "https://6a7685130209.ngrok-free.app"
+  "https://6a7685130209.ngrok-free.app",
   "https://panel.entrfy.com"
 ];
 
