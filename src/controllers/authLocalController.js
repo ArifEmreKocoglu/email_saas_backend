@@ -10,6 +10,7 @@ function cookieOptions() {
     secure: isProd,
     sameSite: isProd ? "none" : "lax",
     path: "/",
+    domain: ".entrfy.com",
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 gün
   };
 }
