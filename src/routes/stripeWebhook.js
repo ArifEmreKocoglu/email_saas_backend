@@ -23,7 +23,7 @@ const PLAN_MAP = {
 
 router.post(
   "/webhook",
-  express.raw({ type: "application/json" }),
+  express.raw({ type: ["application/json", "application/json; charset=utf-8"] }),
   async (req, res) => {
     const sig = req.headers["stripe-signature"];
     let event;
