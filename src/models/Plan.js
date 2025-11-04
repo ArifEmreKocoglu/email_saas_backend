@@ -8,6 +8,7 @@ const PlanSchema = new mongoose.Schema({
     maxLogs: { type: Number, required: true },
   },
   features: [String],
+  stripePriceId: { type: String, required: true },
 });
 
 export default mongoose.model("Plan", PlanSchema);

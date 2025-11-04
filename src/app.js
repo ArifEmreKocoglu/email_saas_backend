@@ -14,6 +14,7 @@ import logRoutes from "./routes/logs.js";
 import dashboardRoutes from "./routes/dashboard.js";
 import { startRewatchJob } from "./jobs/rewatchJob.js";
 import authLocalRoutes from "./routes/authLocal.js";
+import stripeWebhookRoutes from "./routes/stripeWebhook.js";
 
 
 dotenv.config();
@@ -41,6 +42,8 @@ app.use(
     credentials: true,
   })
 );
+
+app.use("/api/stripe", stripeWebhookRoutes);
 
 app.use(express.json());
 
