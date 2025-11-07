@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 
 import cors from "cors";
+import bodyParser from "body-parser"; 
 import connectMongo from "./config/mongo.js";
 import oauthRoutes from "./routes/oauth.js";
 import n8nRoutes from "./routes/n8nRoutes.js";
@@ -43,7 +44,7 @@ app.use(
   })
 );
 
-app.use("/api/stripe", stripeWebhookRoutes);
+app.use("/api/stripe/webhook", bodyParser.raw({ type: "application/json" }), stripeWebhookRoutes);
 
 app.use(express.json());
 

@@ -77,7 +77,7 @@ export async function me(req, res) {
     const user = await User.findById(uid).lean();
     if (!user) return res.status(401).json({ error: "Invalid session" });
 
-    return res.json({ user: { id: user._id, email: user.email, name: user.name, plan: user.plan } });
+    return res.json({ user: { id: user._id, email: user.email, name: user.name, plan: user.plan, limits: user.limits } });
   } catch (e) {
     return res.status(401).json({ error: "Session expired" });
   }

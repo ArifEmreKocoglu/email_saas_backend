@@ -5,7 +5,7 @@ import User from "../models/User.js";
 const router = express.Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// PriceId → Plan eşleme
+// ✅ PriceId → Plan eşleme
 const PLAN_MAP = {
   price_1SPqCQFdfrLPvtbm0MvGEbux: {
     name: "Basic",
@@ -22,8 +22,8 @@ const PLAN_MAP = {
 };
 
 router.post(
-  "/webhook",
-  express.raw({ type: ["application/json", "application/json; charset=utf-8"] }),
+  "/",
+  express.raw({ type: "application/json" }),
   async (req, res) => {
     const sig = req.headers["stripe-signature"];
     let event;
@@ -35,7 +35,7 @@ router.post(
         process.env.STRIPE_WEBHOOK_SECRET
       );
     } catch (err) {
-      console.error("⚠️ Webhook signature verification failed:", err.message);
+      console.error("⚠️ Stripe webhook signature verification failed:", err.message);
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
@@ -43,23 +43,38 @@ router.post(
       switch (event.type) {
         case "checkout.session.completed": {
           const session = event.data.object;
-          const customerEmail = session.customer_email;
-          const priceId = session.metadata?.priceId || session.line_items?.[0]?.price?.id;
 
-          if (!customerEmail) break;
+          // ✅ Email ve priceId yakalama
+          const customerEmail =
+            session.customer_email ||
+            session.customer_details?.email ||
+            null;
+          const priceId =
+            session.metadata?.priceId ||
+            session?.line_items?.[0]?.price?.id ||
+            session?.subscription_data?.items?.[0]?.price?.id ||
+            null;
 
-          const planData = PLAN_MAP[priceId];
-          if (!planData) {
-            console.warn("Unknown priceId:", priceId);
+          if (!customerEmail) {
+            console.warn("⚠️ Missing customer email in session");
             break;
           }
 
+          const planData = PLAN_MAP[priceId];
+          if (!planData) {
+            console.warn("⚠️ Unknown priceId received:", priceId);
+            break;
+          }
+
+          // ✅ Kullanıcının planını güncelle
           const user = await User.findOne({ email: customerEmail });
           if (user) {
             user.plan = planData.name;
             user.limits = planData.limits;
             await user.save();
             console.log(`✅ ${customerEmail} upgraded to ${planData.name}`);
+          } else {
+            console.warn("⚠️ User not found:", customerEmail);
           }
           break;
         }
@@ -72,18 +87,18 @@ router.post(
             user.plan = "Inactive";
             user.limits = { maxMailAccounts: 0, maxLogs: 0 };
             await user.save();
+            console.log(`⚠️ Downgraded ${customer.email} to Inactive`);
           }
-          console.log(`⚠️ Payment failed for ${customer.email}`);
           break;
         }
 
         default:
-          console.log(`Unhandled event type ${event.type}`);
+          console.log(`ℹ️ Unhandled event type: ${event.type}`);
       }
 
       res.status(200).send("ok");
     } catch (err) {
-      console.error("❌ Webhook processing error:", err);
+      console.error("❌ Stripe webhook processing error:", err);
       res.status(500).send("Internal Server Error");
     }
   }
