@@ -1,5 +1,5 @@
 import express from "express";
-import { gmailWatch } from "../controllers/gmailController.js";
+import { gmailWatchByAccount } from "../controllers/gmailController.js";
 
 const router = express.Router();
 
