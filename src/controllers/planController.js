@@ -28,6 +28,9 @@ export const createCheckoutSession = async (req, res) => {
       subscription_data: {
         trial_period_days: 7,
       },
+      metadata: {
+        priceId,
+      },
     });
 
     return res.json({ url: session.url });
