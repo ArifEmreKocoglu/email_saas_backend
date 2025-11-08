@@ -45,7 +45,7 @@ export const getDashboardStats = async (req, res) => {
       totalLogs,
       successLogs,
       errorLogs,
-      successRate,
+      successRate: totalLogs ? ((successLogs / totalLogs) * 100).toFixed(1) : 0,
       last7Days,
       plan: user.plan || "Free",
       limits: {
