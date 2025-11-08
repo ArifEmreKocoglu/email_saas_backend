@@ -35,31 +35,29 @@ export async function createLog(req, res) {
 
     let userId = userIdRaw;
 
+    // 1️⃣ userId yoksa email'den bul
     if (!userId && email) {
-      const acc = await MailAccount.findOne({ email: String(email).toLowerCase() }).lean();
-      if (acc?.userId) userId = acc.userId.toString();
+      const mailOwner = await MailAccount.findOne({ email: String(email).toLowerCase() }).lean();
+      if (mailOwner?.userId) {
+        userId = mailOwner.userId.toString();
+      } else {
+        // direk user collection'ında ara
+        const userDoc = await User.findOne({ email: String(email).toLowerCase() }).lean();
+        if (userDoc?._id) {
+          userId = userDoc._id.toString();
+        }
+      }
     }
+
+    // 2️⃣ hâlâ yoksa cookie veya header'dan çöz
     if (!userId) userId = uidFromReq(req);
 
+    // 3️⃣ yine yoksa hata ver
     if (!userId || !mongoose.isValidObjectId(userId)) {
-      return res.status(400).json({ error: "userId is required" });
+      return res.status(404).json({ error: "User not found" });
     }
 
-    // ✅ 1. Kullanıcıyı çek
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    // ✅ 2. Toplam log sayısını say
-    const totalLogs = await WorkflowLog.countDocuments({ userId });
-
-    // ✅ 3. Plan limitini kontrol et
-    if (totalLogs >= user.limits.maxLogs) {
-      return res.status(403).json({
-        error: `Log limit reached (${user.limits.maxLogs}). Please upgrade your plan.`,
-      });
-    }
-
-    // ✅ 4. Log kaydet
+    // ✅ Log oluştur
     const doc = await WorkflowLog.create({
       userId,
       workflowName: workflowName || "",
@@ -76,6 +74,7 @@ export async function createLog(req, res) {
 
     return res.json({ ok: true, id: doc._id });
   } catch (e) {
+    console.error("❌ Log create error:", e);
     return res.status(500).json({ error: e.message });
   }
 }
