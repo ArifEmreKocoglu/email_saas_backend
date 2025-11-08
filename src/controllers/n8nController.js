@@ -2,7 +2,7 @@ import axios from "axios";
 import { google } from "googleapis";
 import MailAccount from "../models/MailAccount.js";
 
-/* ======================== helpers ======================== */
+// ---- helpers ----
 function oauthClient() {
   return new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -35,31 +35,17 @@ function extractParts(payload) {
   walk(payload);
   return { html, text, attachments };
 }
-function escapeRegex(str = "") {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-function normalizeGmail(email = "") {
-  const e = (email || "").trim().toLowerCase();
-  if (!e.includes("@")) return e;
-  let [local, domain] = e.split("@");
-  if (domain === "googlemail.com") domain = "gmail.com";
-  if (domain === "gmail.com") {
-    local = local.replace(/\./g, "").replace(/\+.*/, "");
-  }
-  return `${local}@${domain}`;
-}
-/* ========================================================= */
 
-/**
- * Pub/Sub push endpoint
- */
+// ---- Pub/Sub push endpoint ----
 export const handleGmailPush = async (req, res) => {
   try {
+
     console.log("📨 Push HIT", {
       path: req.path,
       ip: req.headers["x-forwarded-for"] || req.ip,
       ua: req.headers["user-agent"],
     });
+
 
     const msg = req.body?.message;
     if (!msg?.data) return res.status(204).end(); // erken ACK
@@ -68,30 +54,15 @@ export const handleGmailPush = async (req, res) => {
     const decoded = JSON.parse(Buffer.from(msg.data, "base64").toString("utf8"));
     const { emailAddress, historyId } = decoded || {};
     console.log("3");
-
     // her koşulda ACK ver, işleme arkada devam et
     res.status(204).end();
     if (!emailAddress || !historyId) return;
-
     console.log("4");
-
-    // === E-posta eşleştirme: case-insensitive + gmail dot/plus normalize ===
-    const safeEmail = (emailAddress || "").trim().toLowerCase();
-    const normEmail = normalizeGmail(safeEmail);
-    const emailOr = [
-      { email: new RegExp(`^${escapeRegex(safeEmail)}$`, "i") },
-      { email: new RegExp(`^${escapeRegex(normEmail)}$`, "i") },
-    ];
-    console.log("[PUSH] emailAddress:", safeEmail, "→ normalized:", normEmail, "historyId:", historyId);
-
     // 1) Hesap bazlı çalış
-    const acc = await MailAccount.findOne({ provider: "gmail", $or: emailOr });
-    if (!acc) { console.warn("[gmail push] MailAccount yok:", safeEmail, "norm:", normEmail); return; }
-    if (acc.status !== "active" || !acc.isActive) { console.log("[gmail push] paused/deleted:", acc.email); return; }
-
-    // ⬇️ SAĞLIK PİNGİ
-    await MailAccount.updateOne({ _id: acc._id }, { $set: { lastWebhookAt: new Date() } });
-
+    const acc = await MailAccount.findOne({ provider: "gmail", email: emailAddress });
+    if (!acc) { console.warn("[gmail push] MailAccount yok:", emailAddress); return; }
+    if (acc.status !== "active" || !acc.isActive) { console.log("[gmail push] paused/deleted:", emailAddress); return; }
+    console.log("5");
     // 2) Token yenileme (hesap)
     const now = Date.now();
     if (acc.expiresAt && acc.expiresAt.getTime() <= now) {
@@ -125,7 +96,6 @@ export const handleGmailPush = async (req, res) => {
     let pageToken;
     const seen = new Set();
     console.log("11");
-
     do {
       let histRes;
       try {
@@ -137,14 +107,12 @@ export const handleGmailPush = async (req, res) => {
         });
         console.log("12");
       } catch (err) {
-        const reason =
-          err?.errors?.[0]?.reason ||
-          err?.response?.data?.error?.errors?.[0]?.reason;
+        // 4) "HistoryId too old" reset
+        const reason = err?.errors?.[0]?.reason || err?.response?.data?.error?.errors?.[0]?.reason;
         console.log("14");
         if (err?.code === 404 || reason === "historyIdInvalid") {
           console.warn("[history] too old → reset to current profile.historyId");
           const prof = await gmail.users.getProfile({ userId: "me" });
-          console.log("[WATCHED EMAIL]", acc.email, "=>", prof.data.emailAddress);
           acc.lastHistoryId = String(prof.data.historyId);
           await acc.save();
           console.log("12");
@@ -157,27 +125,28 @@ export const handleGmailPush = async (req, res) => {
       const chunks = histRes.data.history || [];
       console.log("15");
       for (const h of chunks) {
+        // 🔥 Sadece yeni eklenen mesajları dikkate al
         if (!h.messagesAdded) continue;
-
+      
         for (const added of h.messagesAdded) {
           const m = added.message;
           if (!m || seen.has(m.id)) continue;
           seen.add(m.id);
-
-          // 🔒 Sadece INBOX etiketli mesajları işle
+      
+          // 🔥 Sadece INBOX etiketli mesajları işle
           if (!m.labelIds || !m.labelIds.includes("INBOX")) {
             console.log("⏩ skipped non-INBOX message:", m.id);
             continue;
           }
-
+      
           console.log("📩 new message detected:", m.id);
-
+      
           const full = await gmail.users.messages.get({
             userId: "me",
             id: m.id,
             format: "full",
           });
-
+      
           const headers = full.data.payload?.headers || [];
           const subject = header(headers, "Subject");
           const from = header(headers, "From");
@@ -185,11 +154,11 @@ export const handleGmailPush = async (req, res) => {
           const date = header(headers, "Date");
           const internalDate = Number(full.data.internalDate) || Date.now();
           const snippet = full.data.snippet || "";
-
+      
           const { html, text, attachments } = extractParts(full.data.payload);
-
+      
           const payload = {
-            emailAddress: acc.email,
+            emailAddress,
             accountId: acc._id.toString(),
             messageId: m.id,
             threadId: full.data.threadId,
@@ -210,7 +179,7 @@ export const handleGmailPush = async (req, res) => {
               accessToken: acc.accessToken,
             },
           };
-
+      
           try {
             await axios.post(
               `${process.env.N8N_URL}/webhook/mail-ingest-v1`,
@@ -219,8 +188,7 @@ export const handleGmailPush = async (req, res) => {
             );
             console.log("✅ sent to n8n:", m.id);
           } catch (postErr) {
-            console.error(
-              "[n8n webhook] error:",
+            console.error("[n8n webhook] error:",
               postErr?.response?.status,
               postErr?.response?.data || postErr.message
             );
