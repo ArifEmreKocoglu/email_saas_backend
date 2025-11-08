@@ -62,7 +62,10 @@ export const handleGmailPush = async (req, res) => {
     const acc = await MailAccount.findOne({ provider: "gmail", email: emailAddress });
     if (!acc) { console.warn("[gmail push] MailAccount yok:", emailAddress); return; }
     if (acc.status !== "active" || !acc.isActive) { console.log("[gmail push] paused/deleted:", emailAddress); return; }
-    console.log("5");
+    
+    // ⬇️ SAĞLIK PİNGİ — TEK SATIR
+    await MailAccount.updateOne({ _id: acc._id }, { $set: { lastWebhookAt: new Date() } });
+    
     // 2) Token yenileme (hesap)
     const now = Date.now();
     if (acc.expiresAt && acc.expiresAt.getTime() <= now) {
