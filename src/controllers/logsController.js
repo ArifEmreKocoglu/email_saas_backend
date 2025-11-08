@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import WorkflowLog from "../models/Workflow.js"; 
 import MailAccount from "../models/MailAccount.js";
-
+import User from "../models/User.js";
 // JWT'den kullanıcıyı çöz
 function uidFromReq(req) {
   try {
@@ -35,18 +35,31 @@ export async function createLog(req, res) {
 
     let userId = userIdRaw;
 
-    // 1) userId yoksa email -> MailAccount ile çöz
     if (!userId && email) {
       const acc = await MailAccount.findOne({ email: String(email).toLowerCase() }).lean();
       if (acc?.userId) userId = acc.userId.toString();
     }
-    // 2) hâlâ yoksa cookie'den çöz
     if (!userId) userId = uidFromReq(req);
 
     if (!userId || !mongoose.isValidObjectId(userId)) {
       return res.status(400).json({ error: "userId is required" });
     }
 
+    // ✅ 1. Kullanıcıyı çek
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // ✅ 2. Toplam log sayısını say
+    const totalLogs = await WorkflowLog.countDocuments({ userId });
+
+    // ✅ 3. Plan limitini kontrol et
+    if (totalLogs >= user.limits.maxLogs) {
+      return res.status(403).json({
+        error: `Log limit reached (${user.limits.maxLogs}). Please upgrade your plan.`,
+      });
+    }
+
+    // ✅ 4. Log kaydet
     const doc = await WorkflowLog.create({
       userId,
       workflowName: workflowName || "",
