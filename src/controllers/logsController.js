@@ -35,41 +35,44 @@ export async function createLog(req, res) {
 
     let userId = userIdRaw;
 
-    // userId yoksa email'den çöz
+    // 1️⃣ userId yoksa email'den bul
     if (!userId && email) {
-      const acc = await MailAccount.findOne({ email: String(email).toLowerCase() }).lean();
-      if (acc?.userId) userId = acc.userId.toString();
+      const mailOwner = await MailAccount.findOne({ email: String(email).toLowerCase() }).lean();
+      if (mailOwner?.userId) {
+        userId = mailOwner.userId.toString();
+      } else {
+        // direk user collection'ında ara
+        const userDoc = await User.findOne({ email: String(email).toLowerCase() }).lean();
+        if (userDoc?._id) {
+          userId = userDoc._id.toString();
+        }
+      }
     }
 
-    // hala yoksa JWT cookie'den çöz
+    // 2️⃣ hâlâ yoksa cookie veya header'dan çöz
     if (!userId) userId = uidFromReq(req);
 
+    // 3️⃣ yine yoksa hata ver
     if (!userId || !mongoose.isValidObjectId(userId)) {
-      return res.status(400).json({ error: "User not found or invalid userId" });
+      return res.status(404).json({ error: "User not found" });
     }
 
-    const log = await WorkflowLog.create({
+    // ✅ Log oluştur
+    const doc = await WorkflowLog.create({
       userId,
-      workflowName: workflowName || "unknown",
+      workflowName: workflowName || "",
       status: status === "error" ? "error" : "success",
       message: message || "",
       email: email || "",
       subject: subject || "",
-      tag: tag || "General",
+      tag: tag || "",
       workflowId: workflowId || "",
       executionId: executionId || "",
       duration: duration || "",
       errorMessage: errorMessage || null,
     });
 
-    // --- LOG COUNT UPDATE ---
-    const totalLogs = await WorkflowLog.countDocuments({ userId });
-    await User.updateOne(
-      { _id: userId },
-      { $set: { "limits.currentLogs": totalLogs } }
-    );
-
-    return res.json({ ok: true, id: log._id });
+    return res.json({ ok: true, id: doc._id });
   } catch (e) {
     console.error("❌ Log create error:", e);
     return res.status(500).json({ error: e.message });
