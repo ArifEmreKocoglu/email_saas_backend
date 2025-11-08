@@ -82,8 +82,13 @@ export async function createLog(req, res) {
 // UI -> log listele (query'de userId yoksa cookie'den al)
 export async function listLogs(req, res) {
   try {
-    const userId = String(req.auth?.userId || "");  // ← middleware’den geliyor
-    const page  = Math.max(parseInt(req.query.page  || "1", 10), 1);
+    const userId = req.auth?.userId;
+
+    if (!userId || !mongoose.isValidObjectId(userId)) {
+      return res.status(401).json({ error: "Unauthorized or invalid userId" });
+    }
+
+    const page = Math.max(parseInt(req.query.page || "1", 10), 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit || "50", 10), 1), 100);
     const skip = (page - 1) * limit;
 
@@ -94,6 +99,7 @@ export async function listLogs(req, res) {
 
     return res.json({ items, page, limit, total, hasMore: skip + items.length < total });
   } catch (e) {
+    console.error("❌ listLogs error:", e);
     return res.status(500).json({ error: e.message });
   }
 }
