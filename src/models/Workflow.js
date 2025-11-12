@@ -9,7 +9,10 @@ const workflowLogSchema = new mongoose.Schema(
 
     email: { type: String },
     subject: { type: String },
+
     tag: { type: String },
+    tagColor: { type: String },   // ← YENİ EKLEDİK
+
     workflowId: { type: String },
     executionId: { type: String },
     duration: { type: String },

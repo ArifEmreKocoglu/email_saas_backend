@@ -35,29 +35,36 @@ export async function createLog(req, res) {
 
     let userId = userIdRaw;
 
-    // 1️⃣ userId yoksa email'den bul
+    // 1) userId yoksa email -> MailAccount
     if (!userId && email) {
       const mailOwner = await MailAccount.findOne({ email: String(email).toLowerCase() }).lean();
       if (mailOwner?.userId) {
         userId = mailOwner.userId.toString();
       } else {
-        // direk user collection'ında ara
         const userDoc = await User.findOne({ email: String(email).toLowerCase() }).lean();
-        if (userDoc?._id) {
-          userId = userDoc._id.toString();
-        }
+        if (userDoc?._id) userId = userDoc._id.toString();
       }
     }
 
-    // 2️⃣ hâlâ yoksa cookie veya header'dan çöz
+    // 2) cookie / token
     if (!userId) userId = uidFromReq(req);
 
-    // 3️⃣ yine yoksa hata ver
     if (!userId || !mongoose.isValidObjectId(userId)) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // ✅ Log oluştur
+    // 🔥 Kullanıcıyı çek, tagColor bulacağız
+    const userDoc = await User.findById(userId).lean();
+
+    let tagColor = null;
+    if (tag) {
+      const found = userDoc?.tags?.find(
+        (t) => t.label.toLowerCase() === tag.toLowerCase()
+      );
+      tagColor = found?.color || null;
+    }
+
+    // Kaydet
     const doc = await WorkflowLog.create({
       userId,
       workflowName: workflowName || "",
@@ -66,6 +73,7 @@ export async function createLog(req, res) {
       email: email || "",
       subject: subject || "",
       tag: tag || "",
+      tagColor, // ← EKLEDİK
       workflowId: workflowId || "",
       executionId: executionId || "",
       duration: duration || "",
