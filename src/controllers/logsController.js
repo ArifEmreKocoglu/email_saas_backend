@@ -27,6 +27,9 @@ export async function createLog(req, res) {
       email,
       subject,
       tag,
+      tagColor,
+      awaitingReply,     // ← n8n’den gelecek
+      awaitingColor,     // ← n8n’den gelecek
       workflowId,
       executionId,
       duration,
@@ -35,7 +38,7 @@ export async function createLog(req, res) {
 
     let userId = userIdRaw;
 
-    // 1) userId yoksa email -> MailAccount
+    // 1) userId lookup
     if (!userId && email) {
       const mailOwner = await MailAccount.findOne({ email: String(email).toLowerCase() }).lean();
       if (mailOwner?.userId) {
@@ -46,38 +49,40 @@ export async function createLog(req, res) {
       }
     }
 
-    // 2) cookie / token
+    // 2) Cookie token
     if (!userId) userId = uidFromReq(req);
 
     if (!userId || !mongoose.isValidObjectId(userId)) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // 🔥 Kullanıcıyı çek, tagColor bulacağız
+    // Kullanıcıyı çek (tagColor user.tags’ten override edilecekse)
     const userDoc = await User.findById(userId).lean();
 
-    let tagColor = null;
+    let finalTagColor = tagColor;
     if (tag) {
       const found = userDoc?.tags?.find(
         (t) => t.label.toLowerCase() === tag.toLowerCase()
       );
-      tagColor = found?.color || null;
+      if (found?.color) finalTagColor = found.color;
     }
 
     // Kaydet
     const doc = await WorkflowLog.create({
       userId,
-      workflowName: workflowName || "",
-      status: status === "error" ? "error" : "success",
-      message: message || "",
-      email: email || "",
-      subject: subject || "",
-      tag: tag || "",
-      tagColor, // ← EKLEDİK
-      workflowId: workflowId || "",
-      executionId: executionId || "",
-      duration: duration || "",
-      errorMessage: errorMessage || null,
+      workflowName,
+      status,
+      message,
+      email,
+      subject,
+      tag,
+      tagColor: finalTagColor,
+      awaitingReply: Boolean(awaitingReply),
+      awaitingColor,
+      workflowId,
+      executionId,
+      duration,
+      errorMessage,
     });
 
     return res.json({ ok: true, id: doc._id });

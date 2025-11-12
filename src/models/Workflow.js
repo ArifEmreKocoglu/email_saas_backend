@@ -3,19 +3,25 @@ import mongoose from "mongoose";
 const workflowLogSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    workflowName: { type: String },
+
+    workflowName: String,
     status: { type: String, enum: ["success", "error"], default: "success" },
-    message: { type: String },
+    message: String,
 
-    email: { type: String },
-    subject: { type: String },
+    email: String,
+    subject: String,
 
-    tag: { type: String },
-    tagColor: { type: String },   // ← YENİ EKLEDİK
+    // Ana label
+    tag: String,
+    tagColor: String,
 
-    workflowId: { type: String },
-    executionId: { type: String },
-    duration: { type: String },
+    // Reply etiketi
+    awaitingReply: { type: Boolean, default: false },
+    awaitingColor: String,
+
+    workflowId: String,
+    executionId: String,
+    duration: String,
     errorMessage: { type: String, default: null },
 
     createdAt: { type: Date, default: Date.now },
