@@ -1,13 +1,15 @@
 export function requireInternal(req, res, next) {
-    try {
-      const key = req.headers["x-internal-key"];
+    console.log("🔍 Incoming internal header:", req.headers["x-internal-key"]);
+    console.log("🔍 ENV internal key:", process.env.INTERNAL_API_KEY);
   
-      if (!key || key !== process.env.INTERNAL_API_KEY) {
-        return res.status(401).json({ error: "Unauthorized internal request" });
-      }
-  
-      next();
-    } catch (err) {
-      return res.status(401).json({ error: "Internal auth failed" });
+    if (!req.headers["x-internal-key"]) {
+      return res.status(401).json({ error: "KEY_MISSING" });
     }
+  
+    if (req.headers["x-internal-key"] !== process.env.INTERNAL_API_KEY) {
+      return res.status(401).json({ error: "KEY_NOT_MATCH" });
+    }
+  
+    console.log("✅ INTERNAL AUTH OK");
+    next();
   }
