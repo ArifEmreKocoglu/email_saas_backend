@@ -8,6 +8,7 @@ import {
   deleteMailAccount, stopMailWatch 
 } from "../controllers/mailAccountController.js";
 import { requireAuth } from "../middlewares/requireAuth.js";
+import { requireInternal } from "../middlewares/requireInternal.js";
 
 const router = express.Router();
 
@@ -22,5 +23,8 @@ router.delete("/:email/tags/:path", requireAuth, deleteTagPath);
 
 router.delete("/:email", requireAuth, deleteMailAccount);
 router.post("/:email/stop-watch", requireAuth, stopMailWatch);
+
+
+router.get("/:email/tags/internal", requireInternal, getTagsConfig);
 
 export default router;

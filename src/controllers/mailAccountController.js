@@ -68,7 +68,10 @@ const DEFAULT_LABEL_TEMPLATE = {
 export async function initTagsConfig(req, res) {
   try {
     const { email } = req.params;
-    const userId = req.user._id;
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
 
     const account = await MailAccount.findOne({ userId, email });
     if (!account) {
@@ -96,7 +99,10 @@ export async function initTagsConfig(req, res) {
 export async function getTagsConfig(req, res) {
   try {
     const { email } = req.params;
-    const userId = req.user._id;
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
 
     const account = await MailAccount.findOne({ userId, email });
     if (!account) {
@@ -119,7 +125,10 @@ export async function getTagsConfig(req, res) {
 export async function saveTagsConfig(req, res) {
   try {
     const { email } = req.params;
-    const userId = req.user._id;
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
     const { allowed, awaiting, review } = req.body || {};
 
     const account = await MailAccount.findOne({ userId, email });
@@ -148,7 +157,10 @@ export async function saveTagsConfig(req, res) {
 export async function deleteTagPath(req, res) {
   try {
     const { email, path } = req.params;
-    const userId = req.user._id;
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
 
     const account = await MailAccount.findOne({ userId, email });
     if (!account) {
