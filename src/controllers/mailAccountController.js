@@ -118,6 +118,40 @@ export async function getTagsConfig(req, res) {
   }
 }
 
+
+export async function getInternalTagsConfig(req, res) {
+  try {
+    const { email } = req.params;
+
+    // INTERNAL request ise: AUTH CHECK YAPMA
+    const internalKey = req.headers["x-internal-key"];
+    const isInternal = internalKey && internalKey === process.env.INTERNAL_API_KEY;
+
+    let userId = null;
+
+    if (!isInternal) {
+      // Normal kullanıcı isteği
+      userId = req.user?._id;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+    }
+
+    // INTERNAL: userId olmadan bul
+    const query = isInternal ? { email } : { email, userId };
+
+    const account = await MailAccount.findOne(query);
+    if (!account) {
+      return res.status(404).json({ error: "Mail account not found" });
+    }
+
+    const config = account.tagsConfig || DEFAULT_LABEL_TEMPLATE;
+
+    return res.json({ tagsConfig: config, internal: isInternal });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+}
 /**
  * POST /api/mail-accounts/:email/tags
  * Save / overwrite tagsConfig for a mail account

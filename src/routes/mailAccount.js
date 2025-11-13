@@ -5,7 +5,8 @@ import {
   getTagsConfig,
   saveTagsConfig,
   deleteTagPath,
-  deleteMailAccount, stopMailWatch 
+  deleteMailAccount, stopMailWatch, 
+  getInternalTagsConfig
 } from "../controllers/mailAccountController.js";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { requireInternal } from "../middlewares/requireInternal.js";
@@ -15,7 +16,7 @@ const router = express.Router();
 router.get("/", listByUser);
 
 // INTERNAL ROUTE FIRST!!! 🔥
-router.get("/:email/tags/internal", requireInternal, getTagsConfig);
+router.get("/:email/tags/internal", requireInternal, getInternalTagsConfig);
 
 // AUTH ROUTES
 router.post("/:email/tags/init", requireAuth, initTagsConfig);
