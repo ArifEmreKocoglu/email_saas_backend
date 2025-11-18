@@ -133,8 +133,10 @@ export const handleGmailPush = async (req, res) => {
           if (!m || seen.has(m.id)) continue;
           seen.add(m.id);
       
+          console.log("m-label", m.labelIds);
+          console.log("m", m);
           // 🔥 Sadece INBOX etiketli mesajları işle
-          if (!m.labelIds || !m.labelIds.includes("INBOX")) {
+          if (!m.labelIds.includes("INBOX")) {
             console.log("⏩ skipped non-INBOX message:", m.id);
             continue;
           }
