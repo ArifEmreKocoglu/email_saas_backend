@@ -305,15 +305,29 @@ export const handleClassificationResult = async (req, res) => {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    // UserId'yi güvenli almak için MailAccount'tan çekiyoruz
-    const account = await MailAccount.findOne({
-      _id: accountId,
-      email: emailAddress.toLowerCase(),
-    });
+      // UserId'yi güvenli almak için MailAccount'tan çekiyoruz
+      let account;
+      try {
+        account = await MailAccount.findById(accountId);
+      } catch (e) {
+        console.error("[handleClassificationResult] invalid accountId:", accountId, e.message);
+      }
 
-    if (!account) {
-      return res.status(404).json({ error: "MailAccount not found" });
-    }
+      if (!account) {
+        return res.status(404).json({ error: "MailAccount not found" });
+      }
+
+      // Email uyuşmuyorsa sadece logla, yine de devam et
+      if (
+        emailAddress &&
+        account.email &&
+        account.email.toLowerCase() !== emailAddress.toLowerCase()
+      ) {
+        console.warn(
+          "[handleClassificationResult] email mismatch",
+          { bodyEmail: emailAddress, accountEmail: account.email }
+        );
+      }
 
     // LLM kararından labelPath'i çek
     const labelPath =
