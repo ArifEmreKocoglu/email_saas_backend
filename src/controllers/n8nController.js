@@ -366,6 +366,11 @@ export const handleClassificationResult = async (req, res) => {
       !!decision.replyNeeded ||
       false;
 
+    console.log("[ClassificationResult] fields", {
+      from_addr: normalizedMessage.from_addr,
+      link_domains: normalizedMessage.link_domains,
+    });
+
     // 🧠 Template hafızasına yaz
     await upsertTemplateFromMessage({
       userId: account.userId,
