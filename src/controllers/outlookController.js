@@ -68,6 +68,13 @@ function toHeaderList(arr) {
 
 export const handleOutlookNotification = async (req, res) => {
   try {
+    console.log("[outlook notify] HIT", {
+      query: req.query,
+      hasBody: !!req.body,
+      bodyKeys: req.body ? Object.keys(req.body) : [],
+      valueLen: req.body?.value?.length
+    });
+
     // ✅ Microsoft Graph validation: query ?validationToken=...
     const validationToken = req.query?.validationToken;
     if (validationToken) {
