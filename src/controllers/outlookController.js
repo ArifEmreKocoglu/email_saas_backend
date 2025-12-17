@@ -87,17 +87,17 @@ export const handleOutlookNotification = async (req, res) => {
       res.set("Content-Type", "text/plain");
       return res.status(200).send(String(validationToken));
     }
-
+    console.log("1;");
     // Notification body: { value: [ ... ] }
     const notifications = req.body?.value || [];
     res.sendStatus(202); // hızlı ACK (Graph için ideal)
-
+console.log("2;");
     for (const n of notifications) {
       const subscriptionId = n.subscriptionId;
       const clientState = n.clientState;
 
       if (!subscriptionId) continue;
-
+console.log("3;");
       // 1) subscriptionId üzerinden account bul
       const acc = await MailAccount.findOne({
         provider: "outlook",
@@ -116,7 +116,7 @@ export const handleOutlookNotification = async (req, res) => {
         });
         continue;
       }
-
+console.log("4;");
       // 3) resource: "Users('id')/Messages('id')" veya "Me/Messages('id')"
       const resource = n.resource;
       if (!resource) continue;
@@ -125,7 +125,7 @@ export const handleOutlookNotification = async (req, res) => {
       const match = resource.match(/Messages\('([^']+)'\)/i);
       const messageId = match?.[1];
       if (!messageId) continue;
-
+console.log("5;");
       // 4) mail detayını çek
       const msgRes = await graphGet(
         acc,
@@ -133,7 +133,7 @@ export const handleOutlookNotification = async (req, res) => {
           messageId
         )}?$select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,bodyPreview,body,conversationId`
       );
-
+console.log("6;");
       const m = msgRes.data;
       const subject = m.subject || "";
       const from = pickAddress(m.from?.emailAddress);
@@ -141,7 +141,7 @@ export const handleOutlookNotification = async (req, res) => {
       const date = m.receivedDateTime || "";
       const internalDate = date ? Date.parse(date) : Date.now();
       const snippet = m.bodyPreview || "";
-
+console.log("7;");
       const html =
         m.body?.contentType === "html" ? m.body?.content || "" : "";
       const text =
@@ -169,8 +169,9 @@ export const handleOutlookNotification = async (req, res) => {
           accessToken: acc.accessToken,
         },
       };
-
+      console.log("payload-outlook:", payload);
       try {
+        console.log("8;");
         await axios.post(`${process.env.N8N_URL}/webhook/mail-ingest-v1`, payload, {
           headers: { "Content-Type": "application/json" },
         });
