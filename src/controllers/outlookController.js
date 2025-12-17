@@ -14,34 +14,40 @@ async function ensureMsToken(acc) {
   must("MICROSOFT_CLIENT_ID");
   must("MICROSOFT_CLIENT_SECRET");
 
-  if (!acc.refreshToken) throw new Error("Missing Microsoft refreshToken");
+    const rt = acc.refreshToken || acc.outlook?.refreshToken; // ✅ legacy fallback
+    if (!rt) throw new Error("Missing Microsoft refreshToken");
 
-  const tokenUrl =
-    "https://login.microsoftonline.com/common/oauth2/v2.0/token";
+    const form = new URLSearchParams({
+      client_id: process.env.MICROSOFT_CLIENT_ID,
+      client_secret: process.env.MICROSOFT_CLIENT_SECRET,
+      grant_type: "refresh_token",
+      refresh_token: rt,
+      scope: [
+        "openid",
+        "email",
+        "profile",
+        "offline_access",
+        "https://graph.microsoft.com/User.Read",
+        "https://graph.microsoft.com/Mail.ReadWrite",
+      ].join(" "),
 
-  const form = new URLSearchParams({
-    client_id: process.env.MICROSOFT_CLIENT_ID,
-    client_secret: process.env.MICROSOFT_CLIENT_SECRET,
-    grant_type: "refresh_token",
-    refresh_token: acc.refreshToken,
-    scope: [
-      "openid",
-      "email",
-      "profile",
-      "offline_access",
-      "https://graph.microsoft.com/Mail.Read",
-      // ileride kategori atayacaksan Mail.ReadWrite yapacağız
-    ].join(" "),
-  });
+    });
 
-  const { data } = await axios.post(tokenUrl, form.toString(), {
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-  });
+    const tokenUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
 
-  acc.accessToken = data.access_token;
-  if (data.refresh_token) acc.refreshToken = data.refresh_token; // bazen döner
-  acc.expiresAt = new Date(now + Number(data.expires_in || 3600) * 1000);
-  await acc.save();
+    const { data } = await axios.post(tokenUrl, form.toString(), {
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+
+
+    acc.accessToken = data.access_token;
+
+    // ✅ her durumda root’a yaz
+    if (data.refresh_token) acc.refreshToken = data.refresh_token;
+    else if (!acc.refreshToken && rt) acc.refreshToken = rt;
+
+    acc.expiresAt = new Date(now + Number(data.expires_in || 3600) * 1000);
+    await acc.save();
 }
 
 async function graphGet(acc, url) {
