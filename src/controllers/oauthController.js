@@ -177,8 +177,10 @@ const MS_SCOPES = [
   "email",
   "profile",
   "offline_access",
+  "https://graph.microsoft.com/User.Read",
   "https://graph.microsoft.com/Mail.ReadWrite",
 ];
+
 
 
 function decodeJwtPayload(token) {
