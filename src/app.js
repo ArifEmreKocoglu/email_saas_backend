@@ -14,8 +14,10 @@ import planRoutes from "./routes/plan.js";
 import logRoutes from "./routes/logs.js";
 import dashboardRoutes from "./routes/dashboard.js";
 import { startRewatchJob } from "./jobs/rewatchJob.js";
+import { startRewatchOutlookJob } from "./jobs/rewatchOutlookJob.js";
 import authLocalRoutes from "./routes/authLocal.js";
 import stripeWebhookRoutes from "./routes/stripeWebhook.js";
+import outlookPushRoutes from "./routes/outlookPush.js";
 
 
 dotenv.config();
@@ -61,6 +63,7 @@ app.use("/auth", oauthRoutes);
 app.use("/api", n8nRoutes);
 app.use("/api/gmail", gmailRoutes);
 app.use("/webhook/gmail", gmailPushRoutes);
+app.use("/webhook/outlook", outlookPushRoutes);
 app.use("/api/mail-accounts", mailAccountRoutes);
 app.use("/api/plans", planRoutes);
 app.use("/api/logs", logRoutes);
@@ -72,6 +75,7 @@ console.log("ENV check → has JWT:", process.env.JWT_SECRET, PORT);
 
 
 app.listen(PORT, () => {
-console.log(`✅ Server running on port ${PORT}`);
-startRewatchJob();
+  console.log(`✅ Server running on port ${PORT}`);
+  startRewatchJob();
+  startRewatchOutlookJob();
 });

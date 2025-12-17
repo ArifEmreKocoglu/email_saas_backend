@@ -8,16 +8,25 @@ const MailAccountSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+
+    // ✅ provider genişledi (Gmail aynen kalır)
     provider: {
       type: String,
-      enum: ["gmail"],
+      enum: ["gmail", "outlook"],
       default: "gmail",
       index: true,
     },
 
     email: { type: String, required: true, lowercase: true, trim: true },
+
+    // Gmail
     googleId: { type: String, default: null },
 
+    // Outlook / Microsoft (opsiyonel)
+    microsoftId: { type: String, default: null }, // oid / homeAccountId vs için kullanacağız
+    tenantId: { type: String, default: null },
+
+    // ✅ Token alanları provider bazlı kullanılacak (gmail kodun bozulmaz)
     accessToken: String,
     refreshToken: String,
     expiresAt: Date,
@@ -25,15 +34,26 @@ const MailAccountSchema = new mongoose.Schema(
     status: { type: String, enum: ["active", "deleted", "paused"], default: "active" },
     isActive: { type: Boolean, default: true },
 
+    // Gmail watch/history (outlook için boş kalır)
     historyId: { type: String, default: null },
     lastHistoryId: { type: String, default: null },
     watchExpiration: { type: Date, default: null },
 
+    // Outlook realtime/delta için (gmail etkilemez)
+    outlook: {
+      subscriptionId: { type: String, default: null },
+      subscriptionExpiration: { type: Date, default: null },
+      clientState: { type: String, default: null }, // ✅ gerekli
+      deltaLink: { type: String, default: null },
+      lastDeltaSyncAt: { type: Date, default: null },
+    },
+
+
     labelMap: { type: mongoose.Schema.Types.Mixed, default: {} },
 
-    // ✅ Yeni alan: her mail hesabı için LLM etiket yapılandırması
+    // Gmail tarafında kullandığın yapı; Outlook’ta da category map’i için reuse edeceğiz (sonraki adım)
     tagsConfig: {
-      type: mongoose.Schema.Types.Mixed, // allowed, awaiting, review, vb.
+      type: mongoose.Schema.Types.Mixed,
       default: null,
     },
 

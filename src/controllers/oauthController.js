@@ -1,7 +1,9 @@
 import jwt from "jsonwebtoken";
+import axios from "axios";
 import mongoose from "mongoose";
 import { google } from "googleapis";
 import MailAccount from "../models/MailAccount.js";
+import { createOrRenewOutlookSubscription } from "./outlookController.js"; 
 import User from "../models/User.js";
 
 // ✅ Default tagsConfig template backend'dekiyle birebir
@@ -147,11 +149,185 @@ export async function googleCallback(req, res) {
 
     await account.save();
 
-    return res.redirect(
-      `${process.env.FRONTEND_URL}/auth/callback?status=success&email=${encodeURIComponent(email)}`
-    );
+return res.redirect(
+  `${process.env.FRONTEND_URL}/auth/callback?status=success&provider=gmail&email=${encodeURIComponent(email)}`
+);
+
   } catch (e) {
     console.error("[/auth/google/callback] error:", e);
+    return res.redirect(
+      `${process.env.FRONTEND_URL}/auth/callback?status=error&msg=${encodeURIComponent(e.message)}`
+    );
+  }
+}
+
+
+
+
+
+// =========================
+// Microsoft OAuth (Outlook)
+// =========================
+function mustMs(name) {
+  if (!process.env[name]) throw new Error(`${name} is missing`);
+}
+
+const MS_SCOPES = [
+  "openid",
+  "email",
+  "profile",
+  "offline_access",
+  "https://graph.microsoft.com/Mail.ReadWrite",
+];
+
+
+function decodeJwtPayload(token) {
+  try {
+    const part = token.split(".")[1];
+    const padded = part.replace(/-/g, "+").replace(/_/g, "/");
+    const json = Buffer.from(padded, "base64").toString("utf8");
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+export async function startMicrosoftConnect(req, res) {
+  try {
+    must("JWT_SECRET");
+    mustMs("MICROSOFT_CLIENT_ID");
+    mustMs("MICROSOFT_REDIRECT_URI");
+
+    const userId = String(req.query.userId || "");
+    if (!mongoose.isValidObjectId(userId))
+      return res.status(400).send("Invalid userId");
+
+    const state = jwt.sign(
+      { userId, mode: "connect", provider: "outlook" },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    const authorizeUrl =
+      "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
+
+    const params = new URLSearchParams({
+      client_id: process.env.MICROSOFT_CLIENT_ID,
+      response_type: "code",
+      redirect_uri: process.env.MICROSOFT_REDIRECT_URI,
+      response_mode: "query",
+      scope: MS_SCOPES.join(" "),
+      state,
+      prompt: "select_account",
+    });
+
+    return res.redirect(`${authorizeUrl}?${params.toString()}`);
+  } catch (e) {
+    console.error("[/auth/microsoft] error:", e);
+    return res.status(500).send(`[oauth] ${e.message}`);
+  }
+}
+
+export async function microsoftCallback(req, res) {
+  try {
+    must("JWT_SECRET");
+    mustMs("MICROSOFT_CLIENT_ID");
+    mustMs("MICROSOFT_CLIENT_SECRET");
+    mustMs("MICROSOFT_REDIRECT_URI");
+    must("FRONTEND_URL");
+
+    const { code, state } = req.query;
+    const decoded = jwt.verify(String(state), process.env.JWT_SECRET);
+    const userId = decoded?.userId;
+
+    if (!mongoose.isValidObjectId(userId))
+      throw new Error("Invalid userId in state");
+
+    // 1) Exchange code -> tokens
+    const tokenUrl =
+      "https://login.microsoftonline.com/common/oauth2/v2.0/token";
+
+    const form = new URLSearchParams({
+      client_id: process.env.MICROSOFT_CLIENT_ID,
+      client_secret: process.env.MICROSOFT_CLIENT_SECRET,
+      code: String(code),
+      redirect_uri: process.env.MICROSOFT_REDIRECT_URI,
+      grant_type: "authorization_code",
+      scope: MS_SCOPES.join(" "),
+    });
+
+    const tokenRes = await axios.post(tokenUrl, form.toString(), {
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+
+    const {
+      access_token,
+      refresh_token,
+      expires_in,
+      id_token,
+    } = tokenRes.data || {};
+
+    if (!access_token) throw new Error("No access_token from Microsoft");
+
+    // 2) Get user info (email)
+    const meRes = await axios.get("https://graph.microsoft.com/v1.0/me?$select=id,mail,userPrincipalName", {
+      headers: { Authorization: `Bearer ${access_token}` },
+    });
+
+    const msUser = meRes.data || {};
+    const email = (msUser.mail || msUser.userPrincipalName || "").toLowerCase();
+    const microsoftId = msUser.id || null;
+
+    if (!email) throw new Error("Email not found from Microsoft /me");
+
+    const idPayload = id_token ? decodeJwtPayload(id_token) : null;
+    const tenantId = idPayload?.tid || null;
+
+    // 3) Upsert MailAccount (provider: outlook)
+    const now = Date.now();
+    const expiresAt = expires_in ? new Date(now + Number(expires_in) * 1000) : null;
+
+    const account = await MailAccount.findOneAndUpdate(
+      { userId, provider: "outlook", email },
+      {
+        $set: {
+          userId,
+          provider: "outlook",
+          email,
+          microsoftId,
+          tenantId,
+          accessToken: access_token || null,
+          refreshToken: refresh_token || null,
+          expiresAt,
+          status: "active",
+          isActive: true,
+        },
+      },
+      { upsert: true, new: true }
+    );
+
+      if (!account.tagsConfig || Object.keys(account.tagsConfig).length === 0) {
+        account.tagsConfig = DEFAULT_LABEL_TEMPLATE;
+        await account.save();
+      } else {
+        await account.save();
+      }
+
+      try {
+        await createOrRenewOutlookSubscription(account);
+      } catch (e) {
+        console.error(
+          "[outlook] subscription create failed:",
+          e?.response?.data || e.message
+        );
+      }
+
+    return res.redirect(
+      `${process.env.FRONTEND_URL}/auth/callback?status=success&provider=outlook&email=${encodeURIComponent(email)}`
+    );
+
+  } catch (e) {
+    console.error("[/auth/microsoft/callback] error:", e);
     return res.redirect(
       `${process.env.FRONTEND_URL}/auth/callback?status=error&msg=${encodeURIComponent(e.message)}`
     );

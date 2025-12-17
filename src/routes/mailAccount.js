@@ -10,7 +10,8 @@ import {
 } from "../controllers/mailAccountController.js";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { requireInternal } from "../middlewares/requireInternal.js";
-
+import { startOutlookWatch, stopOutlookWatch } from "../controllers/outlookController.js";
+import { addOutlookCategories } from "../controllers/outlookController.js";
 const router = express.Router();
 
 router.get("/", listByUser);
@@ -25,5 +26,10 @@ router.delete("/:email/tags/:path", requireAuth, deleteTagPath);
 
 router.delete("/:email", requireAuth, deleteMailAccount);
 router.post("/:email/stop-watch", requireAuth, stopMailWatch);
+
+
+router.post("/:email/outlook/stop-watch", requireAuth, stopOutlookWatch);
+router.post("/:email/outlook/start-watch", requireAuth, startOutlookWatch);
+router.post("/:email/outlook/categories", requireAuth, addOutlookCategories);
 
 export default router;

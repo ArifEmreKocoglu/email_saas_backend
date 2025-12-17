@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import MailAccount from "../models/MailAccount.js";
 import { google } from "googleapis";
+import { deleteOutlookSubscriptionBestEffort } from "./outlookController.js";
 
 /**
  * GET /api/mail-accounts?userId=
@@ -222,16 +223,31 @@ export async function deleteTagPath(req, res) {
 
 export async function deleteMailAccount(req, res) {
   try {
-    const { email } = req.params;
-    const account = await MailAccount.findOne({ email });
+    const email = decodeURIComponent(req.params.email);
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    const account = await MailAccount.findOne({ email, userId });
 
     if (!account) {
       return res.status(404).json({ error: "Mail account not found" });
     }
 
-    // Soft delete
+    if (account.provider === "outlook") {
+      await deleteOutlookSubscriptionBestEffort(account);
+    }
+
     account.status = "deleted";
     account.isActive = false;
+
+    if (account.provider === "outlook" && account.outlook) {
+      account.outlook.subscriptionId = null;
+      account.outlook.subscriptionExpiration = null;
+    }
+
     await account.save();
 
     return res.json({ success: true, message: `Account ${email} deleted.` });
