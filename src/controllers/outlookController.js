@@ -463,3 +463,47 @@ export async function syncOutlookDelta(req, res) {
     return res.status(500).json({ error: e.message });
   }
 }
+
+
+
+
+export const addOutlookCategoriesById = async (req, res) => {
+  try {
+    const { mailAccountId } = req.params;
+    const { messageId, categories } = req.body;
+
+    if (!messageId || !categories?.length) {
+      return res.status(400).json({ error: "messageId and categories required" });
+    }
+
+    // 1️⃣ MailAccount bul
+    const account = await MailAccount.findById(mailAccountId);
+    if (!account || account.provider !== "outlook") {
+      return res.status(404).json({ error: "Outlook mail account not found" });
+    }
+
+        // 2️⃣ Outlook access token
+    await ensureMsToken(account);
+
+    await axios.patch(
+      `https://graph.microsoft.com/v1.0/me/messages/${encodeURIComponent(messageId)}`,
+      { categories },
+      {
+        headers: {
+          Authorization: `Bearer ${account.accessToken}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+
+    return res.json({
+      success: true,
+      messageId,
+      categories,
+    });
+  } catch (err) {
+    console.error("Outlook add category error:", err?.response?.data || err);
+    return res.status(500).json({ error: "Failed to add Outlook category" });
+  }
+};

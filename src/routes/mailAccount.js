@@ -10,7 +10,7 @@ import {
 } from "../controllers/mailAccountController.js";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { requireInternal } from "../middlewares/requireInternal.js";
-import { startOutlookWatch, stopOutlookWatch, syncOutlookDelta } from "../controllers/outlookController.js";
+import { startOutlookWatch, stopOutlookWatch, syncOutlookDelta, addOutlookCategoriesById } from "../controllers/outlookController.js";
 import { addOutlookCategories } from "../controllers/outlookController.js";
 const router = express.Router();
 
@@ -33,5 +33,11 @@ router.post("/:email/outlook/start-watch", requireAuth, startOutlookWatch);
 router.post("/:email/outlook/categories", requireAuth, addOutlookCategories);
 router.post("/:email/outlook/sync-delta", requireAuth, syncOutlookDelta);
 
+
+router.post(
+  "/id/:mailAccountId/outlook/add-category",
+  requireInternal,
+  addOutlookCategoriesById
+);
 
 export default router;
