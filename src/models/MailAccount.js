@@ -46,6 +46,7 @@ const MailAccountSchema = new mongoose.Schema(
       clientState: { type: String, default: null }, // ✅ gerekli
       deltaLink: { type: String, default: null },
       lastDeltaSyncAt: { type: Date, default: null },
+      lastMessageId: { type: String, default: null },
     },
 
 

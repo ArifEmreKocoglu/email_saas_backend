@@ -116,15 +116,22 @@ console.log("3;");
         });
         continue;
       }
-console.log("4;");
+  console.log("4;");
       // 3) resource: "Users('id')/Messages('id')" veya "Me/Messages('id')"
       const resource = n.resource;
       if (!resource) continue;
 
-      // message id’yi çekelim
-      const match = resource.match(/Messages\('([^']+)'\)/i);
-      const messageId = match?.[1];
-      if (!messageId) continue;
+      // 3) notification messageId içermeyebilir → inbox’tan son maili çek
+      const listRes = await graphGet(
+        acc,
+        "https://graph.microsoft.com/v1.0/me/mailFolders('inbox')/messages?$top=1&$orderby=receivedDateTime desc"
+      );
+
+      const me = listRes.data?.value?.[0];
+      if (!me?.id) continue;
+
+      const messageId = me.id;
+
 console.log("5;");
       // 4) mail detayını çek
       const msgRes = await graphGet(
@@ -146,6 +153,12 @@ console.log("7;");
         m.body?.contentType === "html" ? m.body?.content || "" : "";
       const text =
         m.body?.contentType === "text" ? m.body?.content || "" : "";
+
+        // DUPLICATE GUARD (Outlook)
+if (acc.outlook?.lastMessageId === messageId) {
+  console.log("⏭️ same message, skipped:", messageId);
+  continue;
+}
 
       const payload = {
         emailAddress: acc.email,
@@ -176,6 +189,9 @@ console.log("7;");
           headers: { "Content-Type": "application/json" },
         });
         console.log("✅ outlook sent to n8n:", m.id);
+
+        acc.outlook.lastMessageId = messageId;
+        await acc.save();
       } catch (e) {
         console.error(
           "[outlook -> n8n] error:",
