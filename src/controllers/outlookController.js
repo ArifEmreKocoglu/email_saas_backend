@@ -364,3 +364,86 @@ export async function addOutlookCategories(req, res) {
     return res.status(500).json({ error: e.message });
   }
 }
+
+
+export async function syncOutlookDelta(req, res) {
+  try {
+    const userId = req.user?._id;
+    if (!userId) return res.status(401).json({ error: "Not authenticated" });
+
+    const { email } = req.params;
+
+    const acc = await MailAccount.findOne({
+      userId,
+      email,
+      provider: "outlook",
+      status: "active",
+      isActive: true,
+    });
+    if (!acc) return res.status(404).json({ error: "Outlook account not found" });
+
+    await ensureMsToken(acc);
+
+    let deltaUrl =
+      acc.outlook?.deltaLink ||
+      "https://graph.microsoft.com/v1.0/me/mailFolders('inbox')/messages/delta";
+
+    let sent = 0;
+
+    while (deltaUrl) {
+      const { data } = await axios.get(deltaUrl, {
+        headers: { Authorization: `Bearer ${acc.accessToken}` },
+      });
+
+      for (const m of data.value || []) {
+        // sadece yeni oluşturulan mesajlar
+        if (!m.id || !m.receivedDateTime) continue;
+
+        const payload = {
+          emailAddress: acc.email,
+          accountId: acc._id.toString(),
+          messageId: m.id,
+          threadId: m.conversationId || null,
+          historyId: null,
+          subject: m.subject || "",
+          from: pickAddress(m.from?.emailAddress),
+          to: toHeaderList(m.toRecipients),
+          date: m.receivedDateTime,
+          internalDate: Date.parse(m.receivedDateTime),
+          snippet: m.bodyPreview || "",
+          headers: [],
+          html: "",
+          text: "",
+          attachments: [],
+          oauth: {
+            provider: "outlook",
+            email: acc.email,
+            accessToken: acc.accessToken,
+          },
+        };
+
+        await axios.post(
+          `${process.env.N8N_URL}/webhook/mail-ingest-v1`,
+          payload,
+          { headers: { "Content-Type": "application/json" } }
+        );
+
+        sent++;
+      }
+
+      deltaUrl = data["@odata.nextLink"] || null;
+
+      if (data["@odata.deltaLink"]) {
+        acc.outlook.deltaLink = data["@odata.deltaLink"];
+        acc.outlook.lastDeltaSyncAt = new Date();
+        await acc.save();
+        break;
+      }
+    }
+
+    return res.json({ success: true, sent });
+  } catch (e) {
+    console.error("[syncOutlookDelta] error:", e?.response?.data || e.message);
+    return res.status(500).json({ error: e.message });
+  }
+}

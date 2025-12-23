@@ -322,13 +322,13 @@ export const handleClassificationResult = async (req, res) => {
     }
 
     // 2️⃣ Bulunamazsa email + provider ile fallback
-    if (!account && emailAddress) {
-      account = await MailAccount.findOne({
-        email: emailAddress.toLowerCase(),
-        provider: "gmail",
-        status: { $ne: "deleted" },
-      });
-    }
+      if (!account && emailAddress) {
+        account = await MailAccount.findOne({
+          email: emailAddress.toLowerCase(),
+          status: { $ne: "deleted" },
+        });
+      }
+
 
     if (!account) {
       console.error("[handleClassificationResult] MailAccount not found for", {
