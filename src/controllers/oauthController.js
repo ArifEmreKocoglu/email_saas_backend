@@ -36,6 +36,52 @@ const DEFAULT_LABEL_TEMPLATE = {
   review: { path: "Review/Uncertain", color: "#4a86e8" },
 };
 
+
+// ✅ Outlook için özel DEFAULT (FLAT – category tabanlı)
+const DEFAULT_OUTLOOK_CATEGORIES = {
+  type: "outlook",
+
+  // Outlook native category isimleri
+  categories: [
+    { name: "Finance",      color: "preset1" },
+    { name: "Invoices",     color: "preset1" },
+    { name: "Payments",     color: "preset1" },
+
+    { name: "Security",     color: "preset3" },
+    { name: "Spam",         color: "preset3" },
+    { name: "Phishing",     color: "preset3" },
+
+    { name: "Marketing",    color: "preset6" },
+    { name: "Newsletters",  color: "preset6" },
+    { name: "Promotions",   color: "preset6" },
+
+    { name: "Commerce",     color: "preset4" },
+    { name: "Orders",       color: "preset4" },
+    { name: "Shipping",     color: "preset4" },
+    { name: "Returns",      color: "preset4" },
+
+    { name: "Support",      color: "preset7" },
+    { name: "Tickets",      color: "preset7" },
+
+    { name: "DevOps",       color: "preset7" },
+    { name: "Tools",        color: "preset7" },
+
+    { name: "HR",           color: "preset2" },
+    { name: "Application",  color: "preset2" },
+
+    { name: "Legal",        color: "preset2" },
+    { name: "System",       color: "preset2" },
+    { name: "Personal",     color: "preset5" },
+  ],
+
+  // özel durumlar
+  special: {
+    awaiting: { name: "Awaiting Reply", color: "preset0" },
+    review:   { name: "Review",         color: "preset8" },
+  }
+};
+
+
 function must(name) {
   if (!process.env[name]) throw new Error(`${name} is missing`);
 }
@@ -309,7 +355,7 @@ export async function microsoftCallback(req, res) {
     );
 
       if (!account.tagsConfig || Object.keys(account.tagsConfig).length === 0) {
-        account.tagsConfig = DEFAULT_LABEL_TEMPLATE;
+        account.tagsConfig = DEFAULT_OUTLOOK_CATEGORIES;
         await account.save();
       } else {
         await account.save();
