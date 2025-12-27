@@ -148,27 +148,25 @@ export async function getTagsConfig(req, res) {
 
 
     // 🔥 OUTLOOK İÇİN PRESET → HEX ÇEVİR
-let uiConfig = config;
+        let uiConfig = config;
 
-if (account.provider === "outlook") {
-  uiConfig = {
-    ...config,
-    allowed: (config.allowed || []).map(l => ({
-      ...l,
-      color: OUTLOOK_PRESET_TO_HEX[l.color] ?? l.color,
-    })),
-    awaiting: {
-      ...config.awaiting,
-      color: OUTLOOK_PRESET_TO_HEX[config.awaiting.color] ?? config.awaiting.color,
-    },
-    review: {
-      ...config.review,
-      color: OUTLOOK_PRESET_TO_HEX[config.review.color] ?? config.review.color,
-    },
-  };
-}
+        // 🔥 OUTLOOK → UI NORMALIZE
+        if (account.provider === "outlook") {
+          uiConfig = {
+            type: "outlook",
 
-return res.json({ tagsConfig: uiConfig });
+            allowed: (config.categories || []).map(cat => ({
+              path: cat.name,
+              color: OUTLOOK_PRESET_TO_HEX[cat.color] ?? cat.color,
+            })),
+
+            awaiting: null,
+            review: null,
+          };
+        }
+
+        return res.json({ tagsConfig: uiConfig });
+
 
 
 
