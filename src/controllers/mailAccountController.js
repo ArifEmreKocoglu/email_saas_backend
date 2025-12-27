@@ -107,10 +107,16 @@ export async function initTagsConfig(req, res) {
       return res.status(404).json({ error: "Mail account not found" });
     }
 
-    if (!account.tagsConfig) {
-      account.tagsConfig = DEFAULT_LABEL_TEMPLATE;
-      await account.save();
-    }
+      if (!account.tagsConfig) {
+        account.tagsConfig = DEFAULT_LABEL_TEMPLATE;
+        await account.save();
+
+        // 🔥 EKLENECEK SATIR
+        if (account.provider === "outlook") {
+          await syncOutlookCategoriesFromTagsConfig(account);
+        }
+      }
+
 
     return res.json({
       success: true,

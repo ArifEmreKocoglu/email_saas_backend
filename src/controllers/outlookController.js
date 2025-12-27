@@ -3,7 +3,6 @@ import axios from "axios";
 import crypto from "crypto";
 import MailAccount from "../models/MailAccount.js";
 
-
 // Outlook hex → preset eşlemesi (TEK KAYNAK)
 const OUTLOOK_COLOR_MAP = {
   "#fad165": "preset1", // yellow
@@ -384,6 +383,8 @@ export async function addOutlookCategories(req, res) {
 
     await ensureMsToken(acc);
 
+    await syncOutlookCategoriesFromTagsConfig(acc);
+
     // PATCH message categories (Graph)
     await axios.patch(
       `https://graph.microsoft.com/v1.0/me/messages/${encodeURIComponent(messageId)}`,
@@ -501,6 +502,8 @@ export const addOutlookCategoriesById = async (req, res) => {
 
         // 2️⃣ Outlook access token
     await ensureMsToken(account);
+
+    await syncOutlookCategoriesFromTagsConfig(acc);
 
     await axios.patch(
       `https://graph.microsoft.com/v1.0/me/messages/${encodeURIComponent(messageId)}`,
