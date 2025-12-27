@@ -30,6 +30,32 @@ export async function listByUser(req, res) {
   }
 }
 
+
+// Outlook renk preset ↔ hex dönüşümleri
+const OUTLOOK_PRESET_TO_HEX = {
+  preset0: "#000000",
+  preset1: "#fad165",
+  preset2: "#43d692",
+  preset3: "#ffad47",
+  preset4: "#16a766",
+  preset5: "#a479e2",
+  preset6: "#fb4c2f",
+  preset7: "#f691b3",
+  preset8: "#4a86e8",
+};
+
+const OUTLOOK_HEX_TO_PRESET = {
+  "#000000": "preset0",
+  "#fad165": "preset1",
+  "#43d692": "preset2",
+  "#ffad47": "preset3",
+  "#16a766": "preset4",
+  "#a479e2": "preset5",
+  "#fb4c2f": "preset6",
+  "#f691b3": "preset7",
+  "#4a86e8": "preset8",
+};
+
 /* ============================================================
    TAG CONFIGURATION CONTROLLERS
    ============================================================ */
@@ -132,7 +158,29 @@ export async function getTagsConfig(req, res) {
       };
     }
 
-    return res.json({ tagsConfig: config });
+    // 🔥 OUTLOOK İÇİN PRESET → HEX ÇEVİR
+let uiConfig = config;
+
+if (account.provider === "outlook") {
+  uiConfig = {
+    ...config,
+    allowed: config.allowed.map(l => ({
+      ...l,
+      color: OUTLOOK_PRESET_TO_HEX[l.color] || l.color,
+    })),
+    awaiting: {
+      ...config.awaiting,
+      color: OUTLOOK_PRESET_TO_HEX[config.awaiting.color] || config.awaiting.color,
+    },
+    review: {
+      ...config.review,
+      color: OUTLOOK_PRESET_TO_HEX[config.review.color] || config.review.color,
+    },
+  };
+}
+
+return res.json({ tagsConfig: uiConfig });
+
 
   } catch (e) {
     return res.status(500).json({ error: e.message });
@@ -196,7 +244,28 @@ export async function saveTagsConfig(req, res) {
       return res.status(400).json({ error: "Invalid config structure" });
     }
 
-    account.tagsConfig = { allowed, awaiting, review };
+    // 🔥 HEX → PRESET ÇEVİR VE DB'YE ÖYLE KAYDET
+        account.tagsConfig = {
+          allowed: allowed.map(l => ({
+            path: l.path,
+            color: account.provider === "outlook"
+              ? (OUTLOOK_HEX_TO_PRESET[l.color] || l.color)
+              : l.color,
+          })),
+          awaiting: {
+            ...awaiting,
+            color: account.provider === "outlook"
+              ? (OUTLOOK_HEX_TO_PRESET[awaiting.color] || awaiting.color)
+              : awaiting.color,
+          },
+          review: {
+            ...review,
+            color: account.provider === "outlook"
+              ? (OUTLOOK_HEX_TO_PRESET[review.color] || review.color)
+              : review.color,
+        },
+        };
+
     await account.save();
 
     if (account.provider === "outlook") {
