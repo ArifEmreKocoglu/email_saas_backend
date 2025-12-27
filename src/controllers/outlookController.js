@@ -538,29 +538,25 @@ export async function syncOutlookCategoriesFromTagsConfig(account) {
     provider: account.provider,
   });
 
-  if (account.provider !== "outlook") {
-    console.log("🔴 Not Outlook account, skipping.");
-    return;
-  }
+  if (account.provider !== "outlook") return;
 
   await ensureMsToken(account);
-
   console.log("🟢 Token OK");
 
-  const allowed = account.tagsConfig?.allowed || [];
-  console.log("🟢 Allowed labels:", allowed);
+  const categories = account.tagsConfig?.categories || [];
+  console.log("🟢 Categories:", categories);
 
-  for (const label of allowed) {
-    const preset = label.color; // 🔥 ARTIK DİREKT KULLANIYORUZ
+  for (const cat of categories) {
+    const preset = cat.color;
 
-    console.log("➡️ Processing label:", label);
+    console.log("➡️ Processing category:", cat);
 
     if (!preset || !preset.startsWith("preset")) {
       console.log("⚠️ Invalid preset, skipped:", preset);
       continue;
     }
 
-    const outlookName = normalizeOutlookCategory(label.path);
+    const outlookName = cat.name;
     console.log("🎯 Outlook category name:", outlookName);
     console.log("🎨 Outlook preset color:", preset);
 
@@ -610,3 +606,4 @@ export async function syncOutlookCategoriesFromTagsConfig(account) {
 
   console.log("🏁 [SYNC END]");
 }
+
