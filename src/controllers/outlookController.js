@@ -533,22 +533,40 @@ function normalizeOutlookCategory(path) {
 }
 
 export async function syncOutlookCategoriesFromTagsConfig(account) {
-  console.log("test", account);
-  if (account.provider !== "outlook") return;
+  console.log("🟡 [SYNC START] Account:", {
+    email: account.email,
+    provider: account.provider,
+  });
+
+  if (account.provider !== "outlook") {
+    console.log("🔴 Not Outlook account, skipping.");
+    return;
+  }
 
   await ensureMsToken(account);
-console.log("test-1", account);
+
+  console.log("🟢 Token OK");
+
   const allowed = account.tagsConfig?.allowed || [];
-console.log("test-2", allowed);
+  console.log("🟢 Allowed labels:", allowed);
+
   for (const label of allowed) {
-    const preset = OUTLOOK_COLOR_MAP[label.color];
-    if (!preset) continue;
+    const preset = label.color; // 🔥 ARTIK DİREKT KULLANIYORUZ
 
+    console.log("➡️ Processing label:", label);
 
-console.log("test-3-4", preset, outlookName);
+    if (!preset || !preset.startsWith("preset")) {
+      console.log("⚠️ Invalid preset, skipped:", preset);
+      continue;
+    }
+
+    const outlookName = normalizeOutlookCategory(label.path);
+    console.log("🎯 Outlook category name:", outlookName);
+    console.log("🎨 Outlook preset color:", preset);
+
     try {
-      const outlookName = normalizeOutlookCategory(label.path);
-console.log("test-4", outlookName);
+      console.log("🟢 Trying CREATE category");
+
       await axios.post(
         "https://graph.microsoft.com/v1.0/me/outlook/masterCategories",
         {
@@ -562,13 +580,13 @@ console.log("test-4", outlookName);
           },
         }
       );
+
+      console.log("✅ Category created:", outlookName);
+
     } catch (e) {
-      // varsa hata verir → PATCH dene
       if (e.response?.status === 409) {
+        console.log("🟡 Category exists, trying UPDATE:", outlookName);
 
-        const outlookName = normalizeOutlookCategory(label.path);
-
-      console.log("test-5", outlookName);
         await axios.patch(
           `https://graph.microsoft.com/v1.0/me/outlook/masterCategories('${encodeURIComponent(outlookName)}')`,
           { color: preset },
@@ -579,7 +597,16 @@ console.log("test-4", outlookName);
             },
           }
         );
+
+        console.log("✅ Category updated:", outlookName);
+      } else {
+        console.error("❌ Unexpected Outlook error:", {
+          name: outlookName,
+          error: e.response?.data || e.message,
+        });
       }
     }
   }
+
+  console.log("🏁 [SYNC END]");
 }
