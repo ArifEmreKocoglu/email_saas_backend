@@ -96,21 +96,78 @@ export async function createLog(req, res) {
 export async function listLogs(req, res) {
   try {
     const userId = req.auth?.userId;
-
     if (!userId || !mongoose.isValidObjectId(userId)) {
-      return res.status(401).json({ error: "Unauthorized or invalid userId" });
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const page = Math.max(parseInt(req.query.page || "1", 10), 1);
-    const limit = Math.min(Math.max(parseInt(req.query.limit || "50", 10), 1), 100);
-    const skip = (page - 1) * limit;
+    const {
+      page = "1",
+      limit = "20",
+      search,
+      status,
+      tag,
+      awaiting,
+      dateRange,
+      startDate,
+      endDate,
+    } = req.query;
+
+    const p = Math.max(parseInt(page, 10), 1);
+    const l = Math.min(Math.max(parseInt(limit, 10), 1), 100);
+    const skip = (p - 1) * l;
+
+    const query = { userId };
+
+    if (status) query.status = status;
+    if (tag) query.tag = tag;
+    if (awaiting === "yes") query.awaitingReply = true;
+    if (awaiting === "no") query.awaitingReply = false;
+
+    if (search) {
+      query.$or = [
+        { subject: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+        { message: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    if (dateRange && dateRange !== "all") {
+      const now = new Date();
+      let from;
+
+      if (dateRange === "24h") from = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      if (dateRange === "7d") from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      if (dateRange === "30d") from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+      if (from) query.createdAt = { $gte: from };
+    }
+
+    if (dateRange === "custom" && startDate && endDate) {
+      query.createdAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate),
+      };
+    }
 
     const [items, total] = await Promise.all([
-      WorkflowLog.find({ userId }).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-      WorkflowLog.countDocuments({ userId }),
+      WorkflowLog.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(l)
+        .lean(),
+      WorkflowLog.countDocuments(query),
     ]);
 
-    return res.json({ items, page, limit, total, hasMore: skip + items.length < total });
+    res.set("Cache-Control", "no-store");
+
+    return res.json({
+      items,
+      page: p,
+      limit: l,
+      total,
+      totalPages: Math.ceil(total / l),
+      hasMore: skip + items.length < total,
+    });
   } catch (e) {
     console.error("❌ listLogs error:", e);
     return res.status(500).json({ error: e.message });
