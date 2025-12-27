@@ -140,23 +140,6 @@ export async function getTagsConfig(req, res) {
 
     let config = account.tagsConfig || DEFAULT_LABEL_TEMPLATE;
 
-    // 🔥 SADECE OUTLOOK İÇİN DÖNÜŞÜM
-    if (account.provider === "outlook") {
-      config = {
-        allowed: (account.tagsConfig?.categories || []).map(c => ({
-          path: c.name,
-          color: c.color,
-        })),
-        awaiting: {
-          path: account.tagsConfig?.special?.awaiting?.name || "Awaiting Reply",
-          color: account.tagsConfig?.special?.awaiting?.color || "#000000",
-        },
-        review: {
-          path: account.tagsConfig?.special?.review?.name || "Review",
-          color: account.tagsConfig?.special?.review?.color || "#4a86e8",
-        },
-      };
-    }
 
     // 🔥 OUTLOOK İÇİN PRESET → HEX ÇEVİR
 let uiConfig = config;
@@ -164,22 +147,23 @@ let uiConfig = config;
 if (account.provider === "outlook") {
   uiConfig = {
     ...config,
-    allowed: config.allowed.map(l => ({
+    allowed: (config.allowed || []).map(l => ({
       ...l,
-      color: OUTLOOK_PRESET_TO_HEX[l.color] || l.color,
+      color: OUTLOOK_PRESET_TO_HEX[l.color] ?? l.color,
     })),
     awaiting: {
       ...config.awaiting,
-      color: OUTLOOK_PRESET_TO_HEX[config.awaiting.color] || config.awaiting.color,
+      color: OUTLOOK_PRESET_TO_HEX[config.awaiting.color] ?? config.awaiting.color,
     },
     review: {
       ...config.review,
-      color: OUTLOOK_PRESET_TO_HEX[config.review.color] || config.review.color,
+      color: OUTLOOK_PRESET_TO_HEX[config.review.color] ?? config.review.color,
     },
   };
 }
 
 return res.json({ tagsConfig: uiConfig });
+
 
 
   } catch (e) {

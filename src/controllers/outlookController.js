@@ -525,6 +525,10 @@ export const addOutlookCategoriesById = async (req, res) => {
   }
 };
 
+function normalizeOutlookCategory(path) {
+  return path.split("/").pop(); // sadece son seviye
+}
+
 export async function syncOutlookCategoriesFromTagsConfig(account) {
   if (account.provider !== "outlook") return;
 
@@ -537,10 +541,12 @@ export async function syncOutlookCategoriesFromTagsConfig(account) {
     if (!preset) continue;
 
     try {
+      const outlookName = normalizeOutlookCategory(label.path);
+
       await axios.post(
         "https://graph.microsoft.com/v1.0/me/outlook/masterCategories",
         {
-          displayName: label.path,
+          displayName: outlookName,
           color: preset,
         },
         {
@@ -553,8 +559,12 @@ export async function syncOutlookCategoriesFromTagsConfig(account) {
     } catch (e) {
       // varsa hata verir → PATCH dene
       if (e.response?.status === 409) {
+
+        const outlookName = normalizeOutlookCategory(label.path);
+
+
         await axios.patch(
-          `https://graph.microsoft.com/v1.0/me/outlook/masterCategories('${encodeURIComponent(label.path)}')`,
+          `https://graph.microsoft.com/v1.0/me/outlook/masterCategories('${encodeURIComponent(outlookName)}')`,
           { color: preset },
           {
             headers: {
