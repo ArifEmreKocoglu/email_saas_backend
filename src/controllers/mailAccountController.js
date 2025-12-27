@@ -232,27 +232,22 @@ export async function saveTagsConfig(req, res) {
       return res.status(400).json({ error: "Invalid config structure" });
     }
 
-    // 🔥 HEX → PRESET ÇEVİR VE DB'YE ÖYLE KAYDET
-        account.tagsConfig = {
-          allowed: allowed.map(l => ({
-            path: l.path,
-            color: account.provider === "outlook"
-              ? (OUTLOOK_HEX_TO_PRESET[l.color] || l.color)
-              : l.color,
-          })),
-          awaiting: {
-            ...awaiting,
-            color: account.provider === "outlook"
-              ? (OUTLOOK_HEX_TO_PRESET[awaiting.color] || awaiting.color)
-              : awaiting.color,
-          },
-          review: {
-            ...review,
-            color: account.provider === "outlook"
-              ? (OUTLOOK_HEX_TO_PRESET[review.color] || review.color)
-              : review.color,
-        },
-        };
+    // 🔥 SAVE TAG CONFIG
+    if (account.provider === "outlook") {
+      account.tagsConfig = {
+        categories: allowed.map(l => ({
+          name: l.path,
+          color: OUTLOOK_HEX_TO_PRESET[l.color] || l.color,
+        })),
+      };
+    } else {
+      // Gmail
+      account.tagsConfig = {
+        allowed,
+        awaiting,
+        review,
+      };
+    }
 
     await account.save();
 
@@ -284,22 +279,32 @@ export async function deleteTagPath(req, res) {
       return res.status(404).json({ error: "Mail account not found" });
     }
 
-    if (!account.tagsConfig || !Array.isArray(account.tagsConfig.allowed)) {
-      return res.status(400).json({ error: "No tag configuration found" });
-    }
+    if (account.provider === "outlook") {
+      if (!Array.isArray(account.tagsConfig?.categories)) {
+        return res.status(400).json({ error: "No categories found" });
+      }
 
-    // Filtrele
-    account.tagsConfig.allowed = account.tagsConfig.allowed.filter(
-      (a) => a.path !== path
-    );
+      account.tagsConfig.categories = account.tagsConfig.categories.filter(
+        c => c.name !== path
+      );
+    } else {
+      if (!Array.isArray(account.tagsConfig?.allowed)) {
+        return res.status(400).json({ error: "No labels found" });
+      }
+
+      account.tagsConfig.allowed = account.tagsConfig.allowed.filter(
+        a => a.path !== path
+      );
+    }
 
     await account.save();
 
-    return res.json({ success: true, tagsConfig: account.tagsConfig });
+    return res.json({ success: true });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
 }
+
 
 
 
