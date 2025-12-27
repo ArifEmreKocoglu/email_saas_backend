@@ -51,8 +51,8 @@ app.use("/api/stripe/webhook", bodyParser.raw({ type: "application/json" }), str
 app.use(express.json());
 
 
-app.set("trust proxy", 1);        // prod'da proxy arkasındaysan güvenli cookie için
-app.use(cookieParser());          // <-- JWT cookie okumak için şart
+app.set("trust proxy", 1);        
+app.use(cookieParser());          
 
 // ✅ DB connect
 connectMongo();
