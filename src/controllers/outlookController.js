@@ -503,7 +503,7 @@ export const addOutlookCategoriesById = async (req, res) => {
         // 2️⃣ Outlook access token
     await ensureMsToken(account);
 
-    await syncOutlookCategoriesFromTagsConfig(acc);
+    await syncOutlookCategoriesFromTagsConfig(account);
 
     await axios.patch(
       `https://graph.microsoft.com/v1.0/me/messages/${encodeURIComponent(messageId)}`,
