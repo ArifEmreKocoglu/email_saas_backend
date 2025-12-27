@@ -533,19 +533,22 @@ function normalizeOutlookCategory(path) {
 }
 
 export async function syncOutlookCategoriesFromTagsConfig(account) {
+  console.log("test", account);
   if (account.provider !== "outlook") return;
 
   await ensureMsToken(account);
-
+console.log("test-1", account);
   const allowed = account.tagsConfig?.allowed || [];
-
+console.log("test-2", allowed);
   for (const label of allowed) {
     const preset = OUTLOOK_COLOR_MAP[label.color];
     if (!preset) continue;
 
+
+console.log("test-3-4", preset, outlookName);
     try {
       const outlookName = normalizeOutlookCategory(label.path);
-
+console.log("test-4", outlookName);
       await axios.post(
         "https://graph.microsoft.com/v1.0/me/outlook/masterCategories",
         {
@@ -565,7 +568,7 @@ export async function syncOutlookCategoriesFromTagsConfig(account) {
 
         const outlookName = normalizeOutlookCategory(label.path);
 
-
+      console.log("test-5", outlookName);
         await axios.patch(
           `https://graph.microsoft.com/v1.0/me/outlook/masterCategories('${encodeURIComponent(outlookName)}')`,
           { color: preset },
