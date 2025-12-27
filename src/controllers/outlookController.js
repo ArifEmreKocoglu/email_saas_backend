@@ -3,6 +3,23 @@ import axios from "axios";
 import crypto from "crypto";
 import MailAccount from "../models/MailAccount.js";
 
+
+// Outlook hex → preset eşlemesi (TEK KAYNAK)
+const OUTLOOK_COLOR_MAP = {
+  "#fad165": "preset1", // yellow
+  "#ffad47": "preset3", // orange
+  "#fb4c2f": "preset6", // red
+  "#16a766": "preset4", // green
+  "#f691b3": "preset7", // pink
+  "#43d692": "preset2", // light green
+  "#a479e2": "preset5", // purple
+  "#4a86e8": "preset8", // blue
+  "#000000": "preset0", // gray
+};
+
+
+
+
 function must(name) {
   if (!process.env[name]) throw new Error(`${name} is missing`);
 }
@@ -507,3 +524,46 @@ export const addOutlookCategoriesById = async (req, res) => {
     return res.status(500).json({ error: "Failed to add Outlook category" });
   }
 };
+
+export async function syncOutlookCategoriesFromTagsConfig(account) {
+  if (account.provider !== "outlook") return;
+
+  await ensureMsToken(account);
+
+  const allowed = account.tagsConfig?.allowed || [];
+
+  for (const label of allowed) {
+    const preset = OUTLOOK_COLOR_MAP[label.color];
+    if (!preset) continue;
+
+    try {
+      await axios.post(
+        "https://graph.microsoft.com/v1.0/me/outlook/masterCategories",
+        {
+          displayName: label.path,
+          color: preset,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${account.accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    } catch (e) {
+      // varsa hata verir → PATCH dene
+      if (e.response?.status === 409) {
+        await axios.patch(
+          `https://graph.microsoft.com/v1.0/me/outlook/masterCategories('${encodeURIComponent(label.path)}')`,
+          { color: preset },
+          {
+            headers: {
+              Authorization: `Bearer ${account.accessToken}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
+    }
+  }
+}

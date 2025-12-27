@@ -4,6 +4,8 @@ import mongoose from "mongoose";
 import { google } from "googleapis";
 import MailAccount from "../models/MailAccount.js";
 import { createOrRenewOutlookSubscription } from "./outlookController.js"; 
+import { syncOutlookCategoriesFromTagsConfig } from "./outlookController.js";
+
 import User from "../models/User.js";
 
 // ✅ Default tagsConfig template backend'dekiyle birebir
@@ -356,10 +358,11 @@ export async function microsoftCallback(req, res) {
 
       if (!account.tagsConfig || Object.keys(account.tagsConfig).length === 0) {
         account.tagsConfig = DEFAULT_OUTLOOK_CATEGORIES;
-        await account.save();
-      } else {
-        await account.save();
       }
+
+      await account.save();
+
+      await syncOutlookCategoriesFromTagsConfig(account);
 
       try {
         await createOrRenewOutlookSubscription(account);

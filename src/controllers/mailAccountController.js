@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 import MailAccount from "../models/MailAccount.js";
 import { google } from "googleapis";
 import { deleteOutlookSubscriptionBestEffort } from "./outlookController.js";
+import { syncOutlookCategoriesFromTagsConfig } from "./outlookController.js";
+
 
 /**
  * GET /api/mail-accounts?userId=
@@ -110,10 +112,28 @@ export async function getTagsConfig(req, res) {
       return res.status(404).json({ error: "Mail account not found" });
     }
 
-    // Eğer yoksa varsayılan ile döndür ama DB'ye yazma
-    const config = account.tagsConfig || DEFAULT_LABEL_TEMPLATE;
+    let config = account.tagsConfig || DEFAULT_LABEL_TEMPLATE;
+
+    // 🔥 SADECE OUTLOOK İÇİN DÖNÜŞÜM
+    if (account.provider === "outlook") {
+      config = {
+        allowed: (account.tagsConfig?.categories || []).map(c => ({
+          path: c.name,
+          color: c.color,
+        })),
+        awaiting: {
+          path: account.tagsConfig?.special?.awaiting?.name || "Awaiting Reply",
+          color: account.tagsConfig?.special?.awaiting?.color || "#000000",
+        },
+        review: {
+          path: account.tagsConfig?.special?.review?.name || "Review",
+          color: account.tagsConfig?.special?.review?.color || "#4a86e8",
+        },
+      };
+    }
 
     return res.json({ tagsConfig: config });
+
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
@@ -179,7 +199,12 @@ export async function saveTagsConfig(req, res) {
     account.tagsConfig = { allowed, awaiting, review };
     await account.save();
 
+    if (account.provider === "outlook") {
+      await syncOutlookCategoriesFromTagsConfig(account);
+    }
+
     return res.json({ success: true });
+
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
