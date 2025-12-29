@@ -2,15 +2,23 @@ import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
   {
-    // App oturumu
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    passwordHash: { type: String, default: null }, // local auth için
+    passwordHash: { type: String, default: null },
 
     name: { type: String, default: "" },
     picture: { type: String, default: "" },
 
-    // (Opsiyonel) Google profil alanları - artık zorunlu DEĞİL
+    authType: {
+      type: String,
+      enum: ["local", "google", "microsoft"],
+      required: true,
+      default: "local",
+    },
+
+    // Google / Outlook
     googleId: { type: String, default: null },
+
+    // Mail sync (aynen kalır)
     accessToken: { type: String, default: null },
     refreshToken: { type: String, default: null },
     expiresAt: { type: Date, default: null },

@@ -18,6 +18,7 @@ import { startRewatchOutlookJob } from "./jobs/rewatchOutlookJob.js";
 import authLocalRoutes from "./routes/authLocal.js";
 import stripeWebhookRoutes from "./routes/stripeWebhook.js";
 import outlookPushRoutes from "./routes/outlookPush.js";
+import oauthAuthRoutes from "./routes/oauthAuth.js";
 
 
 dotenv.config();
@@ -60,6 +61,8 @@ connectMongo();
 // ✅ Routes
 app.get("/health", (req, res) => res.json({ status: "ok", message: "Backend running" }));
 app.use("/auth", oauthRoutes);
+app.use("/auth", oauthAuthRoutes);
+
 app.use("/api", n8nRoutes);
 app.use("/api/gmail", gmailRoutes);
 app.use("/webhook/gmail", gmailPushRoutes);
