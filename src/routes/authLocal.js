@@ -1,10 +1,23 @@
 import express from "express";
-import { register, login, me, logout } from "../controllers/authLocalController.js";
+import {
+  register,
+  login,
+  me,
+  logout,
+  forgotPassword,
+  resetPassword,
+} from "../controllers/authLocalController.js";
+
 const router = express.Router();
 
-router.post("/register", register); // POST /api/auth/register
-router.post("/login", login);       // POST /api/auth/login
-router.get("/me", me);              // GET  /api/auth/me
-router.post("/logout", logout);     // POST /api/auth/logout
+// mevcutlar
+router.post("/register", register);
+router.post("/login", login);
+router.get("/me", me);
+router.post("/logout", logout);
+
+// ✅ YENİ – mail sistemi
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password", resetPassword);
 
 export default router;
