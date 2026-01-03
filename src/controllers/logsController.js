@@ -1,13 +1,18 @@
-// controllers/logsController.js  (tam içerik)
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
-import WorkflowLog from "../models/Workflow.js"; 
+import WorkflowLog from "../models/Workflow.js";
 import MailAccount from "../models/MailAccount.js";
 import User from "../models/User.js";
-// JWT'den kullanıcıyı çöz
+
+
+/* --------------------------------------------------
+   Helpers
+-------------------------------------------------- */
 function uidFromReq(req) {
   try {
-    const tok = req.cookies?.sid || (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+    const tok =
+      req.cookies?.sid ||
+      (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
     if (!tok) return null;
     const { uid } = jwt.verify(tok, process.env.JWT_SECRET);
     return uid || null;
@@ -170,6 +175,30 @@ export async function listLogs(req, res) {
     });
   } catch (e) {
     console.error("❌ listLogs error:", e);
+    return res.status(500).json({ error: e.message });
+  }
+}
+
+
+
+/* --------------------------------------------------
+   NEW: GET SINGLE LOG DETAIL
+-------------------------------------------------- */
+export async function getLogDetail(req, res) {
+  try {
+    const userId = req.auth?.userId;
+    const { id } = req.params;
+
+    if (!userId || !mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ error: "Invalid request" });
+    }
+
+    const log = await WorkflowLog.findOne({ _id: id, userId }).lean();
+    if (!log) return res.status(404).json({ error: "Log not found" });
+
+    return res.json(log);
+  } catch (e) {
+    console.error("❌ getLogDetail error:", e);
     return res.status(500).json({ error: e.message });
   }
 }

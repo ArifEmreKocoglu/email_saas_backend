@@ -19,6 +19,7 @@ import authLocalRoutes from "./routes/authLocal.js";
 import stripeWebhookRoutes from "./routes/stripeWebhook.js";
 import outlookPushRoutes from "./routes/outlookPush.js";
 import oauthAuthRoutes from "./routes/oauthAuth.js";
+import replyRoutes from "./routes/replies.js";
 
 
 dotenv.config();
@@ -72,6 +73,8 @@ app.use("/api/plans", planRoutes);
 app.use("/api/logs", logRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/auth", authLocalRoutes);
+app.use("/api/replies", replyRoutes);
+
 
 const PORT = process.env.PORT || 4000;
 console.log("ENV check → has JWT:", process.env.JWT_SECRET, PORT);
