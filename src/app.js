@@ -73,7 +73,7 @@ app.use("/api/plans", planRoutes);
 app.use("/api/logs", logRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/auth", authLocalRoutes);
-app.use("/api/replies", replyRoutes);
+app.use("/api/reply", replyRoutes);
 
 
 const PORT = process.env.PORT || 4000;
