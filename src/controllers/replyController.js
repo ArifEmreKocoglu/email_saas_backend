@@ -249,3 +249,81 @@ export async function saveReplyDraft(req, res) {
     res.status(500).json({ error: e.message });
   }
 }
+
+
+/* -------------------------------------------------
+   POST /request-generate
+   → Frontend tetikler (n8n async)
+-------------------------------------------------- */
+export async function requestReplyGeneration(req, res) {
+  try {
+    const { logId } = req.params;
+    const userId = getAuthUser(req);
+    const { tone = "professional", language = "auto" } = req.body || {};
+
+    if (!assertObjectId(logId)) {
+      return res.status(400).json({ error: "Invalid logId" });
+    }
+
+    const log = await WorkflowLog.findOne({
+      _id: logId,
+      userId,
+      awaitingReply: true,
+    }).lean();
+
+    if (!log) {
+      return res.status(404).json({ error: "Log not found" });
+    }
+
+    let draft = await ReplyDraft.findOne({ logId, userId });
+
+    if (!draft) {
+      const acc = await MailAccount.findOne({
+        email: log.email,
+        userId,
+        status: "active",
+      }).lean();
+
+      if (!acc) {
+        return res.status(404).json({ error: "MailAccount not found" });
+      }
+
+      draft = await ReplyDraft.create({
+        logId,
+        userId,
+        provider: acc.provider,
+        email: acc.email,
+        status: "idle",
+        replies: [],
+      });
+    }
+
+    if (draft.replies.length >= 3) {
+      return res.status(400).json({ error: "Reply limit reached (3)" });
+    }
+
+    // 🔔 n8n ASYNC tetik
+    await axios.post(
+      `${process.env.N8N_URL}/webhook/reply-generate-v1`,
+      {
+        logId,
+        subject: log.subject,
+        email: log.email,
+        tone,
+        language,
+        attempt: draft.replies.length,
+        provider: draft.provider,
+      },
+      { timeout: 10_000 }
+    );
+
+    return res.json({
+      ok: true,
+      status: "queued",
+      message: "AI reply generation started",
+    });
+  } catch (e) {
+    console.error("[requestReplyGeneration]", e);
+    res.status(500).json({ error: e.message });
+  }
+}
