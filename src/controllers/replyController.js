@@ -68,22 +68,24 @@ export async function getReplyContext(req, res) {
 export async function generateReply(req, res) {
   try {
     const { logId } = req.params;
-    const userId = getAuthUser(req);
     const { tone = "professional", language = "auto" } = req.body || {};
 
-    if (!assertObjectId(logId)) {
+    if (!mongoose.isValidObjectId(logId)) {
       return res.status(400).json({ error: "Invalid logId" });
     }
 
+    // ❗️ userId'yi AUTH'TAN ALMIYORUZ
     const log = await WorkflowLog.findOne({
       _id: logId,
-      userId,
       awaitingReply: true,
-    }).lean();
+    });
 
     if (!log) {
       return res.status(404).json({ error: "Log not found" });
     }
+
+    // ✅ userId burada resolve edilir
+    const userId = log.userId;
 
     let draft = await ReplyDraft.findOne({ logId, userId });
 
@@ -104,6 +106,7 @@ export async function generateReply(req, res) {
         provider: acc.provider,
         email: acc.email,
         status: "idle",
+        replies: [],
       });
     }
 
@@ -111,46 +114,26 @@ export async function generateReply(req, res) {
       return res.status(400).json({ error: "Reply limit reached (3)" });
     }
 
-    // n8n payload
-    const payload = {
-      logId,
-      subject: log.subject,
-      email: log.email,
-      tone,
-      language,
-      attempt: draft.replies.length,
-      provider: draft.provider,
-    };
+    // n8n zaten burayı çağırdığı için,
+    // burada AI üretimi yapılmış TEXT bekliyoruz
+    const { text, model } = req.body;
 
-    draft.status = "generating";
-    await draft.save();
-
-    const { data } = await axios.post(
-      `${process.env.N8N_URL}/webhook/reply-generate-v1`,
-      payload,
-      { timeout: 60_000 }
-    );
-
-    if (!data?.text) {
-      throw new Error("Invalid AI response from n8n");
+    if (!text) {
+      return res.status(400).json({ error: "Missing reply text" });
     }
 
     draft.replies.push({
-      text: data.text,
+      text,
       tone,
       language,
       provider: "n8n",
-      model: data.model || null,
+      model: model || null,
     });
 
     draft.status = "completed";
     await draft.save();
 
-    return res.json({
-      ok: true,
-      reply: draft.replies[draft.replies.length - 1],
-      count: draft.replies.length,
-    });
+    return res.json({ ok: true });
   } catch (e) {
     console.error("[generateReply]", e);
     res.status(500).json({ error: e.message });
