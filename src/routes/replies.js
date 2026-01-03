@@ -6,7 +6,7 @@ import {
   getReplyDraft,
   saveReplyDraft,
 } from "../controllers/replyController.js";
-
+import { requireInternal } from "../middlewares/requireInternal.js";
 const router = express.Router();
 
 /* ---------------------------------
@@ -19,7 +19,7 @@ router.get("/:logId/context", requireAuth, getReplyContext);
    Generate AI Reply (n8n trigger)
 ---------------------------------- */
 // Frontend: "Generate Reply" button
-router.post("/:logId/generate", requireAuth, generateReply);
+router.post("/:logId/generate", requireInternal, generateReply);
 
 /* ---------------------------------
    Get Draft State
